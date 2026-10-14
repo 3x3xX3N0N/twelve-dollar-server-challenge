@@ -83,10 +83,13 @@ class Server(private val host: String, private val port: Int, private val db: Db
     fun run() {
         ss = ServerSocketChannel.open()
         ss.setOption(StandardSocketOptions.SO_REUSEADDR, true)
+        // Several worker processes bind the same port; the kernel spreads connections across them.
+        // Each process has its own RLIMIT_NOFILE, so N workers can hold N x 65,535 connections.
+        ss.setOption(StandardSocketOptions.SO_REUSEPORT, true)
         ss.bind(InetSocketAddress(host, port), 65535)
         ss.configureBlocking(false)
         acceptKey = ss.register(sel, SelectionKey.OP_ACCEPT)
-        println("listening on $host:$port")
+        println("worker ${System.getenv("WORKER_ID") ?: "0"} listening on $host:$port")
         while (true) {
             if (writes.isEmpty()) sel.select(onKey) else sel.selectNow(onKey)
             if (writes.isNotEmpty()) runBatch()

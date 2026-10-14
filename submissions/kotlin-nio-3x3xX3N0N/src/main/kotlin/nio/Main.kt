@@ -8,6 +8,7 @@ fun main() {
 
     val db = Db(path)
     db.ping()
-    Checkpointer(path).start()
+    // Only worker 0 checkpoints; the WAL is shared by every worker process.
+    if ((System.getenv("WORKER_ID") ?: "0") == "0") Checkpointer(path).start()
     Server(host, port, db, Jwt(secret)).run()
 }
