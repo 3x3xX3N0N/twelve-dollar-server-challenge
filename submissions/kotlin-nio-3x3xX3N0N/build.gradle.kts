@@ -6,9 +6,7 @@ plugins {
 
 repositories { mavenCentral() }
 
-dependencies {
-    implementation("org.xerial:sqlite-jdbc:3.53.4.0")
-}
+// No dependencies besides the Kotlin stdlib: SQLite is compiled by build.sh and called through FFM.
 
 kotlin {
     compilerOptions {
@@ -20,8 +18,8 @@ kotlin {
 }
 java { targetCompatibility = JavaVersion.VERSION_21 }
 
-// build/lib/*.jar = app + runtime deps; start.sh runs `java -cp 'build/lib/*'`.
-val dist by tasks.registering(Copy::class) {
+// build/lib/*.jar = app + runtime deps; start.sh runs `java -cp 'build/lib/*'`. Sync drops stale jars.
+val dist by tasks.registering(Sync::class) {
     from(tasks.jar)
     from(configurations.runtimeClasspath)
     into(layout.buildDirectory.dir("lib"))

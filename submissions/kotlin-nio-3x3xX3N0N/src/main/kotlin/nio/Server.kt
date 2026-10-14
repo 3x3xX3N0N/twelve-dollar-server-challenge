@@ -38,6 +38,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
     private val rbuf = ByteArray(64 * 1024)
     private val rbb = ByteBuffer.wrap(rbuf)
     private val obuf = ByteBuffer.allocateDirect(1 shl 20)
+    private val obufSeg = java.lang.foreign.MemorySegment.ofBuffer(obuf)
     private var writes = ArrayList<WriteOp>(1024)
     private var spare = ArrayList<WriteOp>(1024)
     private val started = System.nanoTime()
@@ -266,7 +267,10 @@ class Server(private val host: String, private val port: Int, private val db: Db
     private fun route(c: Conn, method: Int, ps: Int, pe: Int, authS: Int, authE: Int, bs: Int, be: Int, close: Boolean) {
         val b = rbuf
         if (eq(b, ps, pe, P_FEED)) {
-            if (method == GET) return respond(c, H200, db.feed(), close)
+            if (method == GET) {
+                if (!db.feed()) return respond(c, H500, E_500, close)
+                return respondRow(c, H200, close)
+            }
         } else if (eq(b, ps, pe, P_HEALTH)) {
             if (method == GET) return health(c, close)
         } else if (startsWith(b, ps, pe, P_POSTS)) {
@@ -281,8 +285,8 @@ class Server(private val host: String, private val port: Int, private val db: Db
                     if (method == GET) {
                         val id = parseId(b, idS, pe)
                         if (id <= 0) return respond(c, H400, E_BAD_ID, close)
-                        val post = db.post(id) ?: return respond(c, H404, E_NO_POST, close)
-                        return respond(c, H200, post, close)
+                        if (!db.post(id)) return respond(c, H404, E_NO_POST, close)
+                        return respondRow(c, H200, close)
                     }
                 } else if (eq(b, slash, pe, P_LIKE) && method == POST) {
                     if (!auth(c, authS, authE, close)) return
@@ -418,12 +422,35 @@ class Server(private val host: String, private val port: Int, private val db: Db
         if (close) c.closeAfter = true
     }
 
-    private fun putResponse(bb: ByteBuffer, head: ByteArray, body: ByteArray, close: Boolean) {
+    /** Sends the row the last db.feed()/db.post() produced: copied from SQLite's memory straight into obuf. */
+    private fun respondRow(c: Conn, head: ByteArray, close: Boolean) {
+        try {
+            val len = db.rowLen
+            val need = head.size + 12 + CLOSE.size + len
+            if (obuf.remaining() < need) flush(c)
+            if (obuf.remaining() < need) {
+                respond(c, head, db.row.toArray(java.lang.foreign.ValueLayout.JAVA_BYTE), close)
+                return
+            }
+            putHead(obuf, head, len, close)
+            java.lang.foreign.MemorySegment.copy(db.row, 0, obufSeg, obuf.position().toLong(), len.toLong())
+            obuf.position(obuf.position() + len)
+            if (close) c.closeAfter = true
+        } finally {
+            db.done()
+        }
+    }
+
+    private fun putHead(bb: ByteBuffer, head: ByteArray, len: Int, close: Boolean) {
         bb.put(head)
-        var v = body.size; var p = num.size
+        var v = len; var p = num.size
         do { num[--p] = ('0'.code + v % 10).toByte(); v /= 10 } while (v > 0)
         bb.put(num, p, num.size - p)
         bb.put(if (close) CLOSE else CRLF2)
+    }
+
+    private fun putResponse(bb: ByteBuffer, head: ByteArray, body: ByteArray, close: Boolean) {
+        putHead(bb, head, body.size, close)
         bb.put(body)
     }
 

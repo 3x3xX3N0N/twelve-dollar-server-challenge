@@ -14,7 +14,7 @@ for i in $(seq 0 $((WORKERS - 1))); do
   WORKER_ID=$i "$JAVA" \
     -XX:+UseSerialGC -Xms128m -Xmx320m -Xss512k \
     -XX:+UseCompactObjectHeaders -XX:-UsePerfData \
-    --enable-native-access=ALL-UNNAMED \
+    --enable-native-access=ALL-UNNAMED -Dsqlite.lib="$DIR/build/native/libsqlite3.so" \
     -cp "$DIR/build/lib/*" nio.MainKt &
   pids+=($!)
 done
