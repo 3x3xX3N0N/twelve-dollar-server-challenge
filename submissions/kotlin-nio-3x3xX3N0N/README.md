@@ -20,7 +20,8 @@ All request handling runs on one thread per process, which suits a 1-vCPU box: t
 6. **JWT verified on every request, without copies.** HMAC-SHA256 runs over the header bytes in place (reused `Mac`, constant-time compare), then the header and payload get a tiny JSON parse (`alg` must be `HS256`, plus the `exp` and `sub`/`username` checks).
 7. **Small JVM.** `-XX:+UseSerialGC -Xmx320m` per worker, compact object headers.
 8. **fd exhaustion doesn't spin.** If `accept()` hits EMFILE (`LimitNOFILE=65535`), the loop stops polling the listen socket and resumes as soon as any connection closes.
-9. **Two worker processes past the 65,535-fd limit.** `RLIMIT_NOFILE` applies per process, so one process can never hold more than ~65.5k sockets. `start.sh` starts `WORKERS` (default 2) identical processes, which share the port through `SO_REUSEPORT`. The kernel spreads new connections across them, so together they can hold ~130k. Each worker keeps its own SQLite connection and group commit; they share the WAL, `BEGIN IMMEDIATE` plus the busy timeout serializes their writes, and only worker 0 runs checkpoints. Both share one vCPU, which costs a little extra memory and context switching. Set `WORKERS=1` for a single process.
+9. **Two worker processes past the 65,535-fd limit.** `RLIMIT_NOFILE` applies per process, so one process can never hold more than ~65.5k sockets. `start.sh` starts `WORKERS` (default 2) identical processes, which share the port through `SO_REUSEPORT`. The kernel spreads new connections across them, so together they can hold ~130k. Only worker 0 runs checkpoints, and `journal_size_limit` caps the WAL file at 64 MB. Set `WORKERS=1` for a single process.
+10. **Writes never block the event loop.** Each worker writes through its own second SQLite connection with `busy_timeout=0`. If the other worker holds the write lock, `BEGIN IMMEDIATE` fails at once and the batch stays queued (new writes join it) while the loop keeps serving reads, retrying about 1 ms later. With the default sleeping busy handler, a busy lock froze a worker's whole event loop for 0.5–1.4 s at a time (measured with 2 workers at 120k users).
 
 ## Durability trade-off
 
@@ -43,5 +44,19 @@ Measured on an i7-10700K. The server was pinned to one core in a `MemoryMax=2G` 
 The 90k rows show the fd limit directly. One process stops at exactly 65,535 descriptors and the extra users get errors, even though latency is fine. Two processes split the connections evenly and pass. A desktop core is much faster than a shared DigitalOcean vCPU, so treat these as relative numbers.
 
 **On the droplet:** this only removes the server-side fd limit. The other limits described in issue #62 belong to the benchmark rig: source ports per load-generator IP, the conntrack table (if it's active), and k6's memory per VU. A submission can't change any of them, because kernel tuning isn't allowed.
+
+### Measured with a low-overhead generator
+
+k6 itself used 35 GB of RAM and 668 s of CPU to drive 120k VUs on this box, which disturbs a local test. So these runs use kload, a small Kotlin replay of `bench/load.js` (not published yet): same users and thresholds, about 3 KB per VU. Near saturation it reported more tail latency than k6, and an independent `curl` probe running alongside confirmed that the server really was stalling. All runs use the current build, a 60 s hold, one core and `ulimit -n 65535`:
+
+| VUs | workers | p95 | p99 (whole run / hold only) | errors | result |
+|---|---|---|---|---|---|
+| 64,000 | 1 | 0.3 ms | 0.9 / 0.5 ms | 0 % | pass |
+| 64,000 | 2 | 0.5 ms | 1.3 / 1.0 ms | 0 % | pass |
+| 90,000 | 2 | 5 ms | 510 / 676 ms | 0 % | pass |
+| 100,000 | 2 | 53 ms | 848 / 987 ms | 0 % | pass, barely |
+| 120,000 | 2 | 578 ms | 1057 / 1106 ms | 0 % | fail |
+
+Above ~100k the limit is two processes sharing one SQLite file, not CPU: the WAL rarely gets a moment with no reader in either process, so it can't reset. At 64k and below, the second worker costs a few tenths of a millisecond.
 
 Profile at 64k (JFR): about 59 % of the busy time is inside SQLite `step` (mostly the feed's 20 like counts), about 17 % is socket read/write syscalls, and the Kotlin code is a few percent.

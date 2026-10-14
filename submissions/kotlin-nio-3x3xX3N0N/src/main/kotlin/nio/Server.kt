@@ -43,6 +43,8 @@ class Server(private val host: String, private val port: Int, private val db: Db
     private val started = System.nanoTime()
     private val onKey = Consumer<SelectionKey> { k -> handleKey(k) }
     private val num = ByteArray(24)
+    private var lockBusy = false
+    private var busySince = 0L
 
     companion object {
         private const val GET = 1
@@ -91,7 +93,11 @@ class Server(private val host: String, private val port: Int, private val db: Db
         acceptKey = ss.register(sel, SelectionKey.OP_ACCEPT)
         println("worker ${System.getenv("WORKER_ID") ?: "0"} listening on $host:$port")
         while (true) {
-            if (writes.isEmpty()) sel.select(onKey) else sel.selectNow(onKey)
+            when {
+                writes.isEmpty() -> sel.select(onKey)
+                lockBusy -> sel.select(onKey, 1) // another worker holds the write lock: keep serving, retry in ~1 ms
+                else -> sel.selectNow(onKey)
+            }
             if (writes.isNotEmpty()) runBatch()
         }
     }
@@ -328,14 +334,28 @@ class Server(private val host: String, private val port: Int, private val db: Db
     // ---------------------------------------------------------------- group commit
 
     private fun runBatch() {
+        // Never block the event loop on another worker's write lock: if BEGIN is busy, keep the queued writes
+        // (new ones keep joining the batch) and try again on the next pass. Give up after 5 s.
+        var ok: Boolean
+        try {
+            if (!db.tryBegin()) {
+                if (busySince == 0L) busySince = System.nanoTime()
+                if (System.nanoTime() - busySince < 5_000_000_000L) { lockBusy = true; return }
+                throw java.sql.SQLException("write lock busy for 5 s")
+            }
+            ok = true
+        } catch (e: Exception) {
+            System.err.println("group commit failed: $e")
+            ok = false
+        }
+        lockBusy = false
+        busySince = 0L
         val ops = writes
         writes = spare
         val n = ops.size
         val status = arrayOfNulls<ByteArray>(n)
         val bodies = arrayOfNulls<ByteArray>(n)
-        var ok: Boolean
-        try {
-            db.begin()
+        if (ok) try {
             for (k in 0 until n) {
                 val op = ops[k]
                 try {
@@ -355,7 +375,6 @@ class Server(private val host: String, private val port: Int, private val db: Db
                 }
             }
             db.commit()
-            ok = true
         } catch (e: Exception) {
             System.err.println("group commit failed: $e")
             db.rollback()
