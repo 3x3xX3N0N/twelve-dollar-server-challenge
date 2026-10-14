@@ -47,7 +47,7 @@ The 90k rows show the fd limit directly. One process stops at exactly 65,535 des
 
 ### Measured with a low-overhead generator
 
-k6 itself used 35 GB of RAM and 668 s of CPU to drive 120k VUs on this box, which disturbs a local test. So these runs use kload, a small Kotlin replay of `bench/load.js` (not published yet): same users and thresholds, about 3 KB per VU. Near saturation it reported more tail latency than k6, and an independent `curl` probe running alongside confirmed that the server really was stalling. All runs use the current build, a 60 s hold, one core and `ulimit -n 65535`:
+k6 itself used 35 GB of RAM and 668 s of CPU to drive 120k VUs on this box, which disturbs a local test. So these runs use [kload](https://github.com/3x3xX3N0N/kload) (also proposed in #87), a small Kotlin replay of `bench/load.js`: same users and thresholds, about 3 KB per VU. Near saturation it reported more tail latency than k6, and an independent `curl` probe running alongside confirmed that the server really was stalling. All runs use the current build, a 60 s hold, one core and `ulimit -n 65535`:
 
 | VUs | workers | p95 | p99 (whole run / hold only) | errors | result |
 |---|---|---|---|---|---|
