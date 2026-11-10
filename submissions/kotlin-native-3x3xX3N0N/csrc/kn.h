@@ -16,14 +16,19 @@ int db_health(char *err, int errcap);
 int db_feed(uint8_t *out, int cap);
 /* {"post":{...}} into out; returns its length, 0 = no such post, -1 = error. */
 int db_post(int64_t id, uint8_t *out, int cap);
-/* Group commit on the writer: 0 = in a write transaction, 1 = busy (checkpointer hold; retry next pass), -1 = error */
-int db_wbegin(void);
-/* INSERT ... RETURNING the {"post":...} JSON into out; returns its length or -1. */
-int db_insert_post(int64_t uid, const uint8_t *body, int blen, const uint8_t *author, int alen, uint8_t *out, int cap);
-/* 1 = newly liked, 0 = already liked, -1 = no such post, -2 = error */
-int db_like(int64_t uid, int64_t pid);
-int db_wcommit(void);       /* 0 = committed (the reader then drops its snapshot), -1 = error */
-void db_wrollback(void);
+/* Group commit on a committer thread (the writer connection is used only there), so a slow disk write never
+ * stops the loop from serving reads. The loop stages a batch, starts it, and keeps going; when the batch is
+ * committed the thread writes to the eventfd returned by db_wq_init (watched by ring 0: an EV_WAKE event), and only
+ * then does the loop read the results and answer. */
+int db_wq_init(void);   /* starts the committer thread; returns the eventfd it signals (watch it on ring 0), or -1 */
+int db_wq_add_like(int64_t uid, int64_t pid);
+int db_wq_add_post(int64_t uid, const uint8_t *body, int blen, const uint8_t *author, int alen);
+int db_wq_start(void);       /* hands the staged batch to the thread: 0 = started, 1 = a batch is still in flight */
+int db_wq_done(void);        /* >= 0: the in-flight batch is committed (or failed) and has this many results; -1 = not yet */
+/* Result i of the finished batch: post: 201 + JSON; like: 1 new / 0 repeat / -1 no such post; -2 error (and the
+ * whole batch is -2 if its COMMIT failed). For posts the JSON is copied to out; returns its length. */
+int db_wq_result(int i, int *code, uint8_t *out, int cap);
+void db_wq_release(void);    /* results read: the reader drops its snapshot (the next read sees the commit) */
 /* End of a loop pass: drops the reader's snapshot if the checkpointer is waiting for readers to move on. */
 void db_pass_end(void);
 /* Compares the B-tree paths with the SQL paths, byte for byte, for every post id in [1, max id + 10] and the feed.
@@ -38,6 +43,7 @@ int64_t db_stat(int which);
 #define EV_DATA 1
 #define EV_OPEN 2
 #define EV_CLOSED 3
+#define EV_WAKE 4    /* the eventfd from ur_watch_eventfd fired */
 typedef struct kn_ev {
     int32_t kind;
     int32_t slot;   /* ring * 65536 + direct-descriptor index */
@@ -58,6 +64,8 @@ void ur_done(void);
 void ur_send(int slot, int gen, const uint8_t *p, int len);
 /* Closes the connection once its queued output is sent. */
 void ur_close_after(int slot, int gen);
+/* Watch an eventfd on ring 0: each write to it becomes one EV_WAKE event (re-armed automatically). */
+int ur_watch_eventfd(int fd);
 /* Open connections and other counters for the stats line. */
 int64_t ur_stat(int which);
 

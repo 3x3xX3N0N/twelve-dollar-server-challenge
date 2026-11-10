@@ -7,20 +7,22 @@
  *   reader  - GET /feed, GET /posts/:id, /health. Its read transaction (snapshot) is kept across loop passes and
  *             dropped only after our own writer commits (so every request still sees every committed write) or
  *             when the checkpointer waits for readers. Idea credit: rust-iouring-rkkautsar (snapshot reuse).
- *   writer  - the group-commit transaction: BEGIN IMMEDIATE (busy_timeout 0, so a checkpoint hold never blocks the
- *             loop: the batch is retried on the next pass), INSERTs, COMMIT; answers go out only after COMMIT.
+ *   writer  - the group-commit transaction, on its own committer thread: BEGIN IMMEDIATE (busy timeout 1 s, so it
+ *             waits out a checkpoint hold), INSERTs, COMMIT; the loop answers only after COMMIT has returned.
  *   checkpointer thread - PASSIVE every 50 ms; RESTART with a bounded 250 ms hold once the WAL is long and nearly
  *             copied; nice 5. Idea credit: swift-iouring-akbashev, rust-iouring-kensac (MIT).
  * WAL + synchronous=NORMAL (rule 6), mmap off, 64 MiB page cache. */
 #include "sqlite3.c"
 #include "kn.h"
 #include <pthread.h>
+#include <sys/eventfd.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
+#include <stdlib.h>
 
 static sqlite3 *rdb, *wdb;
 static sqlite3_stmt *st_rbegin, *st_rcommit, *st_health, *st_feed_sql, *st_post_sql;
@@ -121,7 +123,7 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
      * ~400k connections the 2 GB box is short of memory, not CPU. */
     if (open_conn(&rdb, 5000, err, errcap, "PRAGMA cache_size=-65536") ||
-        open_conn(&wdb, 0, err, errcap, "PRAGMA cache_size=-16384")) return -1;
+        open_conn(&wdb, 1000, err, errcap, "PRAGMA cache_size=-16384")) return -1;
     if (prep(rdb, "BEGIN", &st_rbegin, err, errcap) ||
         prep(rdb, "COMMIT", &st_rcommit, err, errcap) ||
         prep(rdb, "SELECT 1", &st_health, err, errcap) ||
@@ -199,49 +201,180 @@ int db_post(int64_t id, uint8_t *out, int cap) {
     return post_sql(id, out, cap);
 }
 
-/* ------------------------------------------------------------------ writes */
-int db_wbegin(void) {
-    int rc = step_reset(st_wbegin);
-    if (rc == SQLITE_OK) return 0;
-    return (rc & 0xff) == SQLITE_BUSY ? 1 : -1;
+/* ------------------------------------------------------------------ writes (committer thread) */
+typedef struct wop {
+    int kind;                 /* 0 like, 1 post */
+    int64_t uid, pid;
+    int boff, blen, aoff, alen;   /* body/author bytes in the batch's arena */
+    int code, joff, jlen;     /* results */
+} wop;
+
+typedef struct wbatch {
+    wop *ops;
+    int n, cap;
+    uint8_t *arena;           /* staged body/author bytes, then result JSON */
+    int alen, acap;
+} wbatch;
+
+static wbatch wb[2];
+static wbatch *staging = &wb[0], *inflight = 0;
+static pthread_mutex_t wq_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t wq_cv = PTHREAD_COND_INITIALIZER;
+static int wq_state;          /* 0 idle, 1 batch handed over, 2 batch done */
+static int wq_efd = -1;
+
+static int arena_put(wbatch *b, const uint8_t *p, int n) {
+    if (b->alen + n > b->acap) {
+        int cap = b->acap ? b->acap : 1 << 16;
+        while (cap < b->alen + n) cap *= 2;
+        uint8_t *a = realloc(b->arena, (size_t)cap);
+        if (!a) return -1;
+        b->arena = a; b->acap = cap;
+    }
+    memcpy(b->arena + b->alen, p, (size_t)n);
+    b->alen += n;
+    return b->alen - n;
 }
 
-int db_insert_post(int64_t uid, const uint8_t *body, int blen, const uint8_t *author, int alen, uint8_t *out, int cap) {
-    sqlite3_bind_int64(st_insert, 1, uid);
-    sqlite3_bind_text(st_insert, 2, (const char *)body, blen, SQLITE_STATIC);
-    sqlite3_bind_text(st_insert, 3, (const char *)author, alen, SQLITE_STATIC);
-    int n = -1;
-    if (sqlite3_step(st_insert) == SQLITE_ROW) n = copy_text(st_insert, 0, out, cap);
-    /* Step to the end so the INSERT is complete before the statement is reset. */
-    while (n >= 0 && sqlite3_step(st_insert) == SQLITE_ROW) {}
-    sqlite3_reset(st_insert);
-    sqlite3_clear_bindings(st_insert);
-    return n;
+static wop *wq_push(void) {
+    wbatch *b = staging;
+    if (b->n == b->cap) {
+        int cap = b->cap ? b->cap * 2 : 256;
+        wop *o = realloc(b->ops, sizeof(wop) * (size_t)cap);
+        if (!o) return 0;
+        b->ops = o; b->cap = cap;
+    }
+    wop *o = &b->ops[b->n++];
+    memset(o, 0, sizeof *o);
+    return o;
 }
 
-int db_like(int64_t uid, int64_t pid) {
-    sqlite3_bind_int64(st_exists, 1, pid);
-    int rc = sqlite3_step(st_exists);
-    sqlite3_reset(st_exists);
-    if (rc == SQLITE_DONE) return -1;
-    if (rc != SQLITE_ROW) return -2;
-    sqlite3_bind_int64(st_like, 1, uid);
-    sqlite3_bind_int64(st_like, 2, pid);
-    rc = sqlite3_step(st_like);
-    sqlite3_reset(st_like);
-    if (rc != SQLITE_DONE) return -2;
-    return sqlite3_changes(wdb) > 0 ? 1 : 0;
-}
-
-int db_wcommit(void) {
-    int rc = step_reset(st_wcommit);
-    if (rc != SQLITE_OK) return -1;
-    rd_end();   /* the next read takes a new snapshot that includes this commit */
+int db_wq_add_like(int64_t uid, int64_t pid) {
+    wop *o = wq_push();
+    if (!o) return -1;
+    o->kind = 0; o->uid = uid; o->pid = pid;
     return 0;
 }
 
-void db_wrollback(void) {
-    step_reset(st_wrollback);
+int db_wq_add_post(int64_t uid, const uint8_t *body, int blen, const uint8_t *author, int alen) {
+    wop *o = wq_push();
+    if (!o) return -1;
+    o->kind = 1; o->uid = uid;
+    o->boff = arena_put(staging, body, blen); o->blen = blen;
+    o->aoff = arena_put(staging, author, alen); o->alen = alen;
+    if (o->boff < 0 || o->aoff < 0) { staging->n--; return -1; }
+    return 0;
+}
+
+int db_wq_start(void) {
+    if (inflight) return 1;
+    pthread_mutex_lock(&wq_mu);
+    inflight = staging;
+    staging = staging == &wb[0] ? &wb[1] : &wb[0];
+    staging->n = 0; staging->alen = 0;
+    wq_state = 1;
+    pthread_cond_signal(&wq_cv);
+    pthread_mutex_unlock(&wq_mu);
+    return 0;
+}
+
+int db_wq_done(void) {
+    if (!inflight) return -1;
+    pthread_mutex_lock(&wq_mu);
+    int done = wq_state == 2;
+    pthread_mutex_unlock(&wq_mu);
+    return done ? inflight->n : -1;
+}
+
+int db_wq_result(int i, int *code, uint8_t *out, int cap) {
+    wop *o = &inflight->ops[i];
+    *code = o->code;
+    if (o->kind == 1 && o->code == 201) {
+        if (o->jlen > cap) { *code = -2; return 0; }
+        memcpy(out, inflight->arena + o->joff, (size_t)o->jlen);
+        return o->jlen;
+    }
+    return 0;
+}
+
+void db_wq_release(void) {
+    if (!inflight) return;
+    pthread_mutex_lock(&wq_mu);
+    wq_state = 0;
+    pthread_mutex_unlock(&wq_mu);
+    inflight = 0;
+    rd_end();   /* the next read takes a new snapshot that includes this commit */
+}
+
+/* One batch: BEGIN IMMEDIATE (waits out a checkpoint hold here, off the loop), the statements, COMMIT. */
+static void run_batch(wbatch *b) {
+    int rc = SQLITE_BUSY;
+    for (int tries = 0; tries < 2 && (rc & 0xff) == SQLITE_BUSY; tries++) rc = step_reset(st_wbegin);
+    int ok = rc == SQLITE_OK;
+    if (!ok) fprintf(stderr, "group commit: BEGIN: %s\n", sqlite3_errmsg(wdb));
+    for (int i = 0; ok && i < b->n; i++) {
+        wop *o = &b->ops[i];
+        if (o->kind == 0) {
+            sqlite3_bind_int64(st_exists, 1, o->pid);
+            rc = sqlite3_step(st_exists);
+            sqlite3_reset(st_exists);
+            if (rc == SQLITE_DONE) { o->code = -1; continue; }
+            if (rc != SQLITE_ROW) { o->code = -2; continue; }
+            sqlite3_bind_int64(st_like, 1, o->uid);
+            sqlite3_bind_int64(st_like, 2, o->pid);
+            rc = sqlite3_step(st_like);
+            sqlite3_reset(st_like);
+            o->code = rc != SQLITE_DONE ? -2 : sqlite3_changes(wdb) > 0 ? 1 : 0;
+        } else {
+            sqlite3_bind_int64(st_insert, 1, o->uid);
+            sqlite3_bind_text(st_insert, 2, (const char *)b->arena + o->boff, o->blen, SQLITE_TRANSIENT);
+            sqlite3_bind_text(st_insert, 3, (const char *)b->arena + o->aoff, o->alen, SQLITE_TRANSIENT);
+            o->code = -2;
+            if (sqlite3_step(st_insert) == SQLITE_ROW) {
+                int n = sqlite3_column_bytes(st_insert, 0);
+                const unsigned char *t = sqlite3_column_text(st_insert, 0);
+                int off = t ? arena_put(b, t, n) : -1;
+                if (off >= 0) { o->joff = off; o->jlen = n; o->code = 201; }
+                while (sqlite3_step(st_insert) == SQLITE_ROW) {}
+            }
+            sqlite3_reset(st_insert);
+            sqlite3_clear_bindings(st_insert);
+        }
+    }
+    if (ok && step_reset(st_wcommit) != SQLITE_OK) {
+        fprintf(stderr, "group commit: COMMIT: %s\n", sqlite3_errmsg(wdb));
+        step_reset(st_wrollback);
+        ok = 0;
+    }
+    if (!ok) for (int i = 0; i < b->n; i++) b->ops[i].code = -2;
+}
+
+static void *wq_main(void *arg) {
+    (void)arg;
+    for (;;) {
+        pthread_mutex_lock(&wq_mu);
+        while (wq_state != 1) pthread_cond_wait(&wq_cv, &wq_mu);
+        wbatch *b = inflight;
+        pthread_mutex_unlock(&wq_mu);
+        run_batch(b);
+        pthread_mutex_lock(&wq_mu);
+        wq_state = 2;
+        pthread_mutex_unlock(&wq_mu);
+        uint64_t one = 1;
+        if (write(wq_efd, &one, sizeof one) < 0) perror("committer eventfd");
+    }
+    return 0;
+}
+
+int db_wq_init(void) {
+    wq_efd = eventfd(0, EFD_CLOEXEC);
+    if (wq_efd < 0) return -1;
+    pthread_t t;
+    pthread_attr_t a;
+    pthread_attr_init(&a);
+    pthread_attr_setdetachstate(&a, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setstacksize(&a, 512 * 1024);
+    return pthread_create(&t, &a, wq_main, 0) == 0 ? wq_efd : -1;
 }
 
 /* ------------------------------------------------------------------ verification */

@@ -53,13 +53,17 @@ in flat arrays (no object per connection). JWTs: HS256 with the key's inner/oute
 transaction open between passes and drops it right after our own writer commits (so a request that arrives after a
 201 always sees that write) or when the checkpointer waits for readers. Fewer WAL read-lock round trips.
 
-**Writes and durability.** WAL, `synchronous=NORMAL`. Writes are queued and group-committed on a second connection
-once the oldest has waited 2 ms or 64 are queued: `BEGIN IMMEDIATE` (busy timeout 0), the INSERTs, `COMMIT`, and
-only then are the 201s handed to the kernel. A failed COMMIT answers every write of the batch with a 500.
+**Writes and durability.** WAL, `synchronous=NORMAL`. Writes are queued and group-committed once the oldest has
+waited 2 ms or 64 are queued. The commit runs on a **committer thread** with its own connection: `BEGIN IMMEDIATE`,
+the INSERTs, `COMMIT`; when it returns, the thread writes to an eventfd that ring 0 watches, and only then does the
+loop read the results and hand the 201s to the kernel. Meanwhile the loop keeps serving reads, and new writes queue
+for the next batch. (Measured reason: with the commit on the loop, a 5-minute hold at 352k users failed on p99
+because a few group commits took ~2 s in `pwrite` on a busy disk, and every read waited behind them.) A failed
+COMMIT answers every write of the batch with a 500.
 
 **Checkpoints off the loop.** A thread at nice 5 runs a PASSIVE checkpoint every 50 ms on its own connection; once
 the WAL has 4,096 frames and all but 128 are copied, a RESTART with a 250 ms busy timeout briefly holds the writer
-(whose `BEGIN` simply fails and retries next pass, so the loop never blocks) and the WAL starts over from frame 1.
+(the committer thread's `BEGIN` waits it out, off the loop) and the WAL starts over from frame 1.
 Idea credit: swift-iouring-akbashev, rust-iouring-kensac.
 
 **SQLite build options**: `SQLITE_THREADSAFE=2`, `SQLITE_ENABLE_QPSG` (plans fixed at prepare time),

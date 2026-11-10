@@ -40,8 +40,7 @@ class Server(private val jwt: Jwt) {
     private var writes = ArrayList<WriteOp>(1024)
     private var spare = ArrayList<WriteOp>(1024)
     private val started = kn_now_ns()
-    private var lockBusy = false
-    private var busySince = 0L
+    private var inFlight = ArrayList<WriteOp>(1024)   // the batch the committer thread is working on
     private var firstWriteNs = 0L
     private val num = ByteArray(24)
     private var tPoll = 0L; private var tRead = 0L; private var tBatch = 0L; private var tAll = 0L
@@ -64,7 +63,8 @@ class Server(private val jwt: Jwt) {
         private val PACE_NR = envLong("KN_PACE_NR", 1).toInt()     // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
         private val STATS = envLong("KN_STATS", 0) != 0L
-        private val PROF = envLong("KN_PROF", 0) != 0L   // time split on the stats line (two clock reads per stage)
+        private val PROF = envLong("KN_PROF", 0) != 0L
+        private val STALLS = envLong("KN_STALLS", 0) != 0L  // log passes whose work took > 100 ms   // time split on the stats line (two clock reads per stage)
 
         private fun a(s: String) = s.encodeToByteArray()
         private fun head(code: String) = a("HTTP/1.1 $code\r\nContent-Type: application/json\r\nContent-Length: ")
@@ -106,28 +106,36 @@ class Server(private val jwt: Jwt) {
             var waitNr = if (light) PACE_NR else 1
             var timeoutUs = if (light) PACE_US else -1L
             when {
-                writes.isNotEmpty() && lockBusy -> timeoutUs = minOf(if (timeoutUs < 0) 1000 else timeoutUs, 1000)  // checkpoint hold: retry in ~1 ms
-                writes.isNotEmpty() -> {
+                writes.isNotEmpty() && inFlight.isEmpty() -> {
                     val left = WRITE_WINDOW_NS - (kn_now_ns() - firstWriteNs)
                     val w = if (left <= 0 || writes.size >= BATCH_MAX) 0 else (left + 999) / 1000
                     timeoutUs = if (timeoutUs < 0) w else minOf(timeoutUs, w)
                 }
             }
-            val t0 = if (PROF) kn_now_ns() else 0L
+            val t0 = kn_now_ns()
             val n = ur_poll(evs, MAX_EV, waitNr, timeoutUs)
-            val t1 = if (PROF) kn_now_ns() else 0L
+            val t1 = kn_now_ns()
             for (i in 0 until n) {
                 val e = evs[i]
                 when (e.kind) {
                     EV_DATA -> onData(e.slot, e.gen, e.ptr!!, e.len)
                     EV_OPEN -> { open[e.slot] = true; sgen[e.slot] = e.gen; busy[e.slot] = false; closeAfter[e.slot] = false; pending[e.slot] = null }
                     EV_CLOSED -> if (sgen[e.slot] == e.gen) { open[e.slot] = false; pending[e.slot] = null }
+                    EV_WAKE -> finishBatch()
                 }
             }
             ur_done()
-            val t2 = if (PROF) kn_now_ns() else 0L
-            if (writes.isNotEmpty() && (lockBusy || writes.size >= BATCH_MAX || kn_now_ns() - firstWriteNs >= WRITE_WINDOW_NS)) runBatch()
+            val t2 = kn_now_ns()
+            val nw = writes.size
+            if (writes.isNotEmpty() && inFlight.isEmpty() && (writes.size >= BATCH_MAX || kn_now_ns() - firstWriteNs >= WRITE_WINDOW_NS)) startBatch()
             db_pass_end()
+            if (STALLS) {
+                // A pass whose own work (not the wait for completions) took > 100 ms: print where the time went.
+                val t3 = kn_now_ns()
+                if (t3 - t1 > 100_000_000L || (t1 - t0 > 100_000_000L && n > 0))
+                    println("stall: poll ${(t1 - t0) / 1000} us (timeout $timeoutUs, $n events), handlers ${(t2 - t1) / 1000} us, " +
+                        "batch ${(t3 - t2) / 1000} us ($nw writes, ${inFlight.size} in flight)")
+            }
             if (PROF) {
                 // ur_poll's time includes sleeping in io_uring_enter, so the busy part is estimated from CPU time below
                 val t3 = kn_now_ns(); tPoll += t1 - t0; tBatch += t3 - t2; tAll += t3 - t0; nPasses++
@@ -363,59 +371,54 @@ class Server(private val jwt: Jwt) {
 
     // ---------------------------------------------------------------- group commit
 
-    private fun runBatch() {
-        // Never block the loop on the checkpointer's hold: if BEGIN is busy, keep the queued writes (new ones keep
-        // joining the batch) and try again on the next pass. Give up after 5 s.
-        var ok: Boolean
-        when (db_wbegin()) {
-            0 -> ok = true
-            1 -> {
-                if (busySince == 0L) busySince = kn_now_ns()
-                if (kn_now_ns() - busySince < 5_000_000_000L) { lockBusy = true; return }
-                println("group commit failed: write lock busy for 5 s"); ok = false
-            }
-            else -> { println("group commit failed: BEGIN"); ok = false }
-        }
-        lockBusy = false
-        busySince = 0L
+    /** Hands the queued writes to the committer thread (csrc/db.c), unless a batch is still being committed. */
+    private fun startBatch() {
+        if (inFlight.isNotEmpty()) return
         val ops = writes
-        writes = spare
-        val n = ops.size
-        val status = arrayOfNulls<ByteArray>(n)
-        val bodies = arrayOfNulls<ByteArray>(n)
-        if (ok) {
-            val out = tptr.reinterpret<UByteVar>()
-            for (k in 0 until n) {
-                val op = ops[k]
-                if (op.isLike) {
-                    when (db_like(op.userId, op.postId)) {
-                        -1 -> { status[k] = H404; bodies[k] = E_NO_POST }
-                        1 -> { status[k] = H201; bodies[k] = likeBody(LIKED_NEW, op.postId) }
-                        0 -> { status[k] = H200; bodies[k] = likeBody(LIKED_OLD, op.postId) }
-                        else -> { println("write failed: like"); status[k] = H500; bodies[k] = E_500 }
-                    }
-                } else {
-                    val body = op.body!!; val author = op.author!!
-                    val len = body.usePinned { bp -> author.usePinned { ap ->
-                        db_insert_post(op.userId, bp.addressOf(0).reinterpret(), body.size, ap.addressOf(0).reinterpret(), author.size, out, tmp.size)
-                    } }
-                    if (len > 0) { status[k] = H201; bodies[k] = tmp.copyOf(len) }
-                    else { println("write failed: insert"); status[k] = H500; bodies[k] = E_500 }
-                }
+        for (op in ops) {
+            val rc = if (op.isLike) db_wq_add_like(op.userId, op.postId) else {
+                val body = op.body!!; val author = op.author!!
+                body.usePinned { bp -> author.usePinned { ap ->
+                    db_wq_add_post(op.userId, bp.addressOf(0).reinterpret(), body.size, ap.addressOf(0).reinterpret(), author.size)
+                } }
             }
-            if (db_wcommit() != 0) {
-                println("group commit failed: COMMIT")
-                db_wrollback()
-                ok = false
+            if (rc != 0) println("group commit: out of memory staging a write")
+        }
+        writes = inFlight
+        inFlight = ops
+        db_wq_start()
+    }
+
+    /** The committer thread signalled: if the batch is committed, answer everybody and resume their pipelined input. */
+    private fun finishBatch() {
+        val n = db_wq_done()
+        if (n < 0) return
+        val ops = inFlight
+        val out = tptr.reinterpret<UByteVar>()
+        val code = nativeHeap.alloc<IntVar>()
+        val status = arrayOfNulls<ByteArray>(ops.size)
+        val bodies = arrayOfNulls<ByteArray>(ops.size)
+        for (k in 0 until ops.size) {
+            val op = ops[k]
+            val len = if (k < n) db_wq_result(k, code.ptr, out, tmp.size) else { code.value = -2; 0 }
+            when {
+                op.isLike && code.value == -1 -> { status[k] = H404; bodies[k] = E_NO_POST }
+                op.isLike && code.value == 1 -> { status[k] = H201; bodies[k] = likeBody(LIKED_NEW, op.postId) }
+                op.isLike && code.value == 0 -> { status[k] = H200; bodies[k] = likeBody(LIKED_OLD, op.postId) }
+                !op.isLike && code.value == 201 -> { status[k] = H201; bodies[k] = tmp.copyOf(len) }
+                else -> { status[k] = H500; bodies[k] = E_500 }
             }
         }
-        // Committed (or failed): now answer everybody, and resume their pipelined input.
-        for (k in 0 until n) {
+        nativeHeap.free(code)
+        db_wq_release()   // the reader drops its snapshot: later reads see this commit
+        inFlight = spare
+        spare = ops
+        for (k in 0 until ops.size) {
             val op = ops[k]
             val slot = op.slot
             if (!open[slot] || sgen[slot] != op.gen) continue
             busy[slot] = false
-            if (ok) respond(slot, op.gen, status[k]!!, bodies[k]!!, op.close) else respond(slot, op.gen, H500, E_500, op.close)
+            respond(slot, op.gen, status[k]!!, bodies[k]!!, op.close)
             val pend = pending[slot]
             if (pend != null && !closeAfter[slot]) {
                 val len = pendingLen[slot]
@@ -426,7 +429,6 @@ class Server(private val jwt: Jwt) {
             } else flush(slot, op.gen)
         }
         ops.clear()
-        spare = ops
     }
 
     private fun likeBody(prefix: ByteArray, id: Long): ByteArray {

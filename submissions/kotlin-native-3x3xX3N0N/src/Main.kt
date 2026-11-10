@@ -29,6 +29,9 @@ fun main() {
     if (env("KN_VERIFY") == "1") exit(if (db_verify() == 0) 0 else 1)
     if (ckpt_start() != 0) println("checkpointer thread not started")
     if (ur_init(host, port, envLong("KN_RINGS", 8).toInt()) != 0) exit(1)
+    // Group commit runs on its own thread; it wakes the loop through this eventfd (watched by ring 0).
+    val wakeFd = db_wq_init()
+    if (wakeFd < 0 || ur_watch_eventfd(wakeFd) != 0) { println("committer thread not started"); exit(1) }
     println("listening on $host:$port (vfs ${vfs ?: "unix"}, btree reads ${if (btree == 1) "on" else "off"})")
     Server(Jwt(secret)).run()
 }

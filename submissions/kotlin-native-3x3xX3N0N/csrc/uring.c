@@ -43,7 +43,7 @@
 #define FD_MARGIN 256
 #define REARM_MAX 256
 
-enum { K_ACCEPT = 1, K_RECV = 2, K_SEND = 3, K_CLOSE = 4, K_SHUT = 5, K_EVFD = 6 };
+enum { K_ACCEPT = 1, K_RECV = 2, K_SEND = 3, K_CLOSE = 4, K_SHUT = 5, K_EVFD = 6, K_WATCH = 7 };
 
 typedef struct conn {
     uint32_t gen;
@@ -70,7 +70,8 @@ typedef struct ringx {
 static ringx R[MAX_RINGS];
 static int nrings, maxrings, lfd = -1, efd = -1, table_size;
 static int defer_taskrun;   /* KN_DEFER=1: IORING_SETUP_DEFER_TASKRUN (completions run only when we enter) */
-static uint64_t efd_val;
+static uint64_t efd_val, watch_val;
+static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
 static int64_t st_open, st_enobufs, st_accept_err, st_rearms;
 static int64_t st_cqe[MAX_RINGS], st_acc_ok[MAX_RINGS];
@@ -368,6 +369,13 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
         conn_closed(r, idx);   /* EOF, reset, or our shutdown */
         return;
     }
+    case K_WATCH: {
+        struct io_uring_sqe *s = sqe_of(0);
+        io_uring_prep_read(s, watch_fd, &watch_val, sizeof watch_val, 0);
+        io_uring_sqe_set_data64(s, ud(K_WATCH, 0, 0, 0));
+        if (res > 0) emit(EV_WAKE, 0, 0, 0, 0, 0);
+        return;
+    }
     case K_EVFD: {
         struct io_uring_sqe *s = sqe_of(0);
         io_uring_prep_read(s, efd, &efd_val, sizeof efd_val, 0);
@@ -459,6 +467,14 @@ int64_t ur_stat(int which) {
     case 4: return st_rearms;
     default: return 0;
     }
+}
+
+int ur_watch_eventfd(int fd) {
+    watch_fd = fd;
+    struct io_uring_sqe *s = sqe_of(0);
+    io_uring_prep_read(s, watch_fd, &watch_val, sizeof watch_val, 0);
+    io_uring_sqe_set_data64(s, ud(K_WATCH, 0, 0, 0));
+    return 0;
 }
 
 int64_t kn_now_ns(void) {
