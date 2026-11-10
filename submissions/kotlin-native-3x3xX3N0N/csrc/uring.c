@@ -179,7 +179,19 @@ int ur_init(const char *host, int port, int max_rings) {
     a.sin_family = AF_INET;
     a.sin_port = htons((uint16_t)port);
     if (inet_pton(AF_INET, host, &a.sin_addr) != 1) { fprintf(stderr, "bad HOST %s\n", host); return -1; }
-    if (bind(lfd, (struct sockaddr *)&a, sizeof a) < 0) { perror("bind"); return -1; }
+    /* A restart right after a stop can find the port still in LISTEN: on 6.8 kernels the old process's io_uring is
+     * torn down asynchronously after exit, and its pending multishot accept keeps the old listener alive until then
+     * (seen on a Vultr Ubuntu 24.04 VM, 6.8.0-147: "bind: Address already in use" one second after a stop with ~1k
+     * open connections). SO_REUSEADDR does not cover a listener, so retry for up to 30 s. */
+    for (int tries = 0;; tries++) {
+        if (bind(lfd, (struct sockaddr *)&a, sizeof a) == 0) {
+            if (tries) fprintf(stderr, "bind: port free after %d.%d s\n", tries / 10, tries % 10);
+            break;
+        }
+        if (errno != EADDRINUSE || tries >= 300) { perror("bind"); return -1; }
+        if (tries == 0) fprintf(stderr, "bind: address in use, retrying for up to 30 s\n");
+        usleep(100 * 1000);
+    }
     if (listen(lfd, 65535) < 0) { perror("listen"); return -1; }
     if (ring_create(0)) return -1;
     nrings = 1;

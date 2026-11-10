@@ -100,6 +100,11 @@ is not a NIC, so these numbers rank designs, they are not a score.
 many completions or this long), `KN_RINGS`, `KN_STATS=1` / `KN_CKPT_LOG=1` (counters on stdout/stderr every 10 s),
 `KN_VERIFY=1` (the byte-for-byte check above).
 
+Extra checks besides `test/run.sh`: `test-restart.sh` (a restart right after a stop with open connections comes up
+healthy; on Ubuntu's 6.8 kernel the old process's io_uring keeps its listener alive briefly after exit, so `bind()`
+is retried for up to 30 s) and `test-rings.sh` (with tiny tables, 2,500 connections spill over 8 rings and all are
+answered).
+
 ## Credits (ideas only; no files or code copied; all MIT)
 
 - rust-iouring-kensac: rings spilling past the fd cap, 512 accepts in flight, soft `RLIMIT_NOFILE` raised to hard,
