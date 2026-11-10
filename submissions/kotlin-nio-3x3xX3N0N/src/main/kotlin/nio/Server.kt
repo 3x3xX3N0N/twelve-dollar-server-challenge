@@ -48,6 +48,8 @@ class Server(private val host: String, private val port: Int, private val db: Db
     private var busySince = 0L
     private var firstWriteNs = 0L   // when the oldest queued write arrived
     private var keysThisPass = 0
+    private var conns = 0
+    private var connCap = Int.MAX_VALUE   // stop accepting here, before the fd table is full
 
     companion object {
         private const val GET = 1
@@ -63,6 +65,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
         private const val BATCH_MAX = 64
         private const val PACE_NS = 1_000_000L
         private const val LIGHT_PASS = 32
+        private const val FD_MARGIN = 128
 
         private fun a(s: String) = s.toByteArray(Charsets.UTF_8)
         private fun head(code: String) = a("HTTP/1.1 $code\r\nContent-Type: application/json\r\nContent-Length: ")
@@ -105,6 +108,11 @@ class Server(private val host: String, private val port: Int, private val db: Db
         ss.configureBlocking(false)
         if (!Sys.deferAccept(ss, 5)) System.err.println("TCP_DEFER_ACCEPT not set")
         acceptKey = ss.register(sel, SelectionKey.OP_ACCEPT)
+        // Soft RLIMIT_NOFILE up to the hard limit, then keep FD_MARGIN descriptors free (SQLite, the checkpointer,
+        // the JVM's own files): at the cap the listener is paused and new connections wait in the backlog instead
+        // of each accept failing with EMFILE. (Idea from davidefrageri's entry: errors 24 -> 0 at its fd limit.)
+        val soft = Sys.raiseNofile()
+        if (soft > 0) connCap = (minOf(soft, Int.MAX_VALUE.toLong()).toInt() - Sys.openFds() - FD_MARGIN).coerceAtLeast(64)
         println("worker ${System.getenv("WORKER_ID") ?: "0"} listening on $host:$port")
         while (true) {
             keysThisPass = 0
@@ -138,6 +146,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
 
     private fun accept() {
         while (true) {
+            if (conns >= connCap) { acceptPaused = true; acceptKey.interestOps(0); return }
             val ch = try { ss.accept() } catch (e: IOException) {
                 // Out of file descriptors (EMFILE): the listen socket stays readable, so stop polling it
                 // until a connection closes instead of spinning on it.
@@ -155,6 +164,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
                 ch.setOption(ExtendedSocketOptions.TCP_QUICKACK, false)
                 val c = Conn(ch)
                 c.key = ch.register(sel, SelectionKey.OP_READ, c)
+                conns++
             } catch (e: IOException) {
                 try { ch.close() } catch (_: IOException) {}
             }
@@ -164,6 +174,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
     private fun close(c: Conn) {
         if (c.closed) return
         c.closed = true
+        conns--
         c.key.cancel()
         try { c.ch.close() } catch (_: IOException) {}
         c.pending = null; c.out = null
