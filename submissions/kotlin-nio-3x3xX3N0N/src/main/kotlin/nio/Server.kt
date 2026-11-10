@@ -9,6 +9,7 @@ import java.nio.channels.Selector
 import java.nio.channels.ServerSocketChannel
 import java.nio.channels.SocketChannel
 import java.util.function.Consumer
+import jdk.net.ExtendedSocketOptions
 
 class Conn(val ch: SocketChannel) {
     lateinit var key: SelectionKey
@@ -102,6 +103,7 @@ class Server(private val host: String, private val port: Int, private val db: Db
         ss.setOption(StandardSocketOptions.SO_REUSEPORT, true)
         ss.bind(InetSocketAddress(host, port), 65535)
         ss.configureBlocking(false)
+        if (!Sys.deferAccept(ss, 5)) System.err.println("TCP_DEFER_ACCEPT not set")
         acceptKey = ss.register(sel, SelectionKey.OP_ACCEPT)
         println("worker ${System.getenv("WORKER_ID") ?: "0"} listening on $host:$port")
         while (true) {
@@ -147,6 +149,10 @@ class Server(private val host: String, private val port: Int, private val db: Db
             try {
                 ch.configureBlocking(false)
                 ch.setOption(StandardSocketOptions.TCP_NODELAY, true)
+                // Delayed ACKs from the start: the ACK for a request rides on its response instead of going out
+                // as a segment of its own while the connection is still in the kernel's initial quick-ACK mode.
+                // (SO_KEEPALIVE is already off: the JDK never sets it, so idle connections cost no probes.)
+                ch.setOption(ExtendedSocketOptions.TCP_QUICKACK, false)
                 val c = Conn(ch)
                 c.key = ch.register(sel, SelectionKey.OP_READ, c)
             } catch (e: IOException) {

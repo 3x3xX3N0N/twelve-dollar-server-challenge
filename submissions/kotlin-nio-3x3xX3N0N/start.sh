@@ -15,7 +15,7 @@ for i in $(seq 0 $((WORKERS - 1))); do
   WORKER_ID=$i "$JAVA" \
     -XX:+UseSerialGC -Xms128m -Xmx320m -Xss512k \
     -XX:+UseCompactObjectHeaders -XX:-UsePerfData \
-    --enable-native-access=ALL-UNNAMED \
+    --enable-native-access=ALL-UNNAMED --add-opens java.base/sun.nio.ch=ALL-UNNAMED \
     -cp "$DIR/build/lib/*" nio.MainKt &
   pids+=($!)
 done
