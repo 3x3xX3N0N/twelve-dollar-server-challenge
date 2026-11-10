@@ -70,6 +70,29 @@ Idea credit: swift-iouring-akbashev, rust-iouring-kensac.
 `SQLITE_DEFAULT_MEMSTATUS=0`, `SQLITE_OMIT_LOAD_EXTENSION`, `SQLITE_OMIT_DEPRECATED`, `SQLITE_OMIT_SHARED_CACHE`,
 `SQLITE_DQS=0`, `SQLITE_USE_ALLOCA`. Pragmas: `mmap_size=0`, `cache_size=-65536` (64 MiB), `wal_autocheckpoint=0`.
 
+## Measured (LOCAL, relative only)
+
+i7-10700K desktop, the server pinned to one core in a 2 GB / no-swap cgroup with `ulimit -n 65535`, kload (a
+k6-compatible replay of `bench/load.js`) on other cores; above ~260k users both run in a private network namespace
+(the host's conntrack table holds 262,144 entries). A desktop core is faster than the droplet's vCPU, and loopback
+is not a NIC, so these numbers rank designs, they are not a score.
+
+| Users | Run | Result | CPU µs/req | CPU | p95 / p99 | cgroup peak |
+|---|---|---|---|---|---|---|
+| 160,000 | 60 s | PASS | 19.4 (the JVM entry: 41-45) | 33 % | 1.4 / 2.3 ms | — |
+| 256,000 | 60 s | PASS | 15.3 | 41 % | 1.2 / 2.4 ms | 1,102 MB |
+| 384,000 | 5-min hold | PASS, 0 errors | 14.1 | 57 % | 1.7 / 26.5 ms | 1,657 MB |
+| 416,000 | 5-min hold | PASS, 0 errors | 13.3 | 59 % | 2.4 / 733 ms | 1,794 MB |
+| 448,000 | 60 s | PASS | 13.3 | 63 % | 2.4 / 416 ms | 1,842 MB |
+
+- Steps (160k users): SQL only 30-44 µs/req → B-tree reads 22-30 (−28-31 %); `unix-excl`, pacing and
+  `DEFER_TASKRUN` measured no better (kept as knobs, off); one read snapshot across passes ~−4 %.
+- The limit is memory, not CPU: ~4.1 KB of kernel socket memory per connection. Process RSS is 19 MB idle and
+  ~100-180 MB under load.
+- The p99 at 416k/448k comes from writes (`POST` p95 ~1.6 s): this desktop's disk was shared with other jobs (IO
+  pressure 25 %); reads stayed at p99 12 ms because the commit runs off the loop.
+- At a 50 % CPU quota: 256k users pass (p99 2.6 ms), 320k is at the edge (p99 457 ms).
+
 ## Knobs (all optional; the defaults are what is scored)
 
 `KN_VFS` (SQLite VFS, default `unix`), `KN_BTREE=0` (SQL only), `KN_SNAPSHOT=0` (new read transaction every pass),
