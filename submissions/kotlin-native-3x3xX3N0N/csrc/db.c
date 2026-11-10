@@ -7,7 +7,7 @@
  *   reader  - GET /feed, GET /posts/:id, /health. Its read transaction (snapshot) is kept across loop passes and
  *             dropped only after our own writer commits (so every request still sees every committed write) or
  *             when the checkpointer waits for readers. Idea credit: rust-iouring-rkkautsar (snapshot reuse).
- *   writer  - the group-commit transaction, on its own committer thread: BEGIN IMMEDIATE (busy timeout 1 s, so it
+ *   writer  - the group-commit transaction, on its own committer thread: BEGIN IMMEDIATE (busy timeout 10 s, so it
  *             waits out a checkpoint hold), INSERTs, COMMIT; the loop answers only after COMMIT has returned.
  *   checkpointer thread - PASSIVE every 50 ms; RESTART with a bounded 250 ms hold once the WAL is long and nearly
  *             copied; nice 5. Idea credit: swift-iouring-akbashev, rust-iouring-kensac (MIT).
@@ -123,7 +123,9 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
      * ~400k connections the 2 GB box is short of memory, not CPU. */
     if (open_conn(&rdb, 5000, err, errcap, "PRAGMA cache_size=-65536") ||
-        open_conn(&wdb, 1000, err, errcap, "PRAGMA cache_size=-16384")) return -1;
+        /* The committer thread is off the loop, so its BEGIN can wait out a checkpoint hold that a slow disk
+         * stretches (measured: 2 x 1 s was not enough at 416k users on a busy disk; 15 likes got a 500). */
+        open_conn(&wdb, 10000, err, errcap, "PRAGMA cache_size=-16384")) return -1;
     if (prep(rdb, "BEGIN", &st_rbegin, err, errcap) ||
         prep(rdb, "COMMIT", &st_rcommit, err, errcap) ||
         prep(rdb, "SELECT 1", &st_health, err, errcap) ||
