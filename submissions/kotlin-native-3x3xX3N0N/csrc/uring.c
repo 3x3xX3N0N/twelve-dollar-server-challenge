@@ -37,7 +37,7 @@
 #define MAX_RINGS 8
 #define SQ_ENTRIES 4096
 #define CQ_ENTRIES 32768
-#define NBUF 4096            /* provided buffers per ring (power of two) */
+#define NBUF 1024            /* provided buffers per ring (power of two); ENOBUFS never seen at 384k users */
 #define BUFSZ 2048
 #define ACCEPT_DEPTH 512
 #define FD_MARGIN 256

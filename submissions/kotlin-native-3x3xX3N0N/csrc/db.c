@@ -65,7 +65,7 @@ static int copy_text(sqlite3_stmt *st, int col, uint8_t *out, int cap) {
     return n;
 }
 
-static int open_conn(sqlite3 **db, int busy_ms, char *err, int errcap) {
+static int open_conn(sqlite3 **db, int busy_ms, char *err, int errcap, const char *cache) {
     if (sqlite3_open_v2(g_path, db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_NOMUTEX, g_vfs[0] ? g_vfs : 0) != SQLITE_OK) {
         snprintf(err, errcap, "open %s: %s", g_path, *db ? sqlite3_errmsg(*db) : "out of memory");
         return -1;
@@ -74,7 +74,7 @@ static int open_conn(sqlite3 **db, int busy_ms, char *err, int errcap) {
     if (exec(*db, "PRAGMA journal_mode=WAL", err, errcap) ||
         exec(*db, "PRAGMA synchronous=NORMAL", err, errcap) ||       /* rule 6 minimum */
         exec(*db, "PRAGMA mmap_size=0", err, errcap) ||              /* pages through the page cache */
-        exec(*db, "PRAGMA cache_size=-65536", err, errcap) ||        /* 64 MiB, allocated as touched */
+        exec(*db, cache, err, errcap) ||                             /* allocated as touched */
         exec(*db, "PRAGMA temp_store=MEMORY", err, errcap) ||
         exec(*db, "PRAGMA wal_autocheckpoint=0", err, errcap) ||     /* the checkpointer thread does it */
         exec(*db, "PRAGMA journal_size_limit=67108864", err, errcap) ||
@@ -118,7 +118,10 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     snprintf(g_path, sizeof g_path, "%s", path);
     snprintf(g_vfs, sizeof g_vfs, "%s", vfs ? vfs : "");
     keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
-    if (open_conn(&rdb, 5000, err, errcap) || open_conn(&wdb, 0, err, errcap)) return -1;
+    /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
+     * ~400k connections the 2 GB box is short of memory, not CPU. */
+    if (open_conn(&rdb, 5000, err, errcap, "PRAGMA cache_size=-65536") ||
+        open_conn(&wdb, 0, err, errcap, "PRAGMA cache_size=-16384")) return -1;
     if (prep(rdb, "BEGIN", &st_rbegin, err, errcap) ||
         prep(rdb, "COMMIT", &st_rcommit, err, errcap) ||
         prep(rdb, "SELECT 1", &st_health, err, errcap) ||
@@ -314,7 +317,7 @@ static void *ckpt_main(void *arg) {
     setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 5);
     sqlite3 *c = 0;
     char err[256];
-    if (open_conn(&c, CK_HOLD_MS, err, sizeof err)) { fprintf(stderr, "checkpointer: %s\n", err); return 0; }
+    if (open_conn(&c, CK_HOLD_MS, err, sizeof err, "PRAGMA cache_size=-2048")) { fprintf(stderr, "checkpointer: %s\n", err); return 0; }
     int logst = getenv("KN_CKPT_LOG") && getenv("KN_CKPT_LOG")[0] == '1';
     int64_t last = now_ns(), maxhold = 0, sumhold = 0;
     int restarts = 0, fails = 0, maxlog = 0;
