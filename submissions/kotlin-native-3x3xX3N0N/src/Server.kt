@@ -64,6 +64,7 @@ class Server(private val jwt: Jwt) {
         private val PACE_NR = envLong("KN_PACE_NR", 256).toInt()   // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
         private val STATS = envLong("KN_STATS", 0) != 0L
+        private val HDR_STRUCT = envLong("KN_HDR", 1) != 0L   // one-pass head parser (request1); 0 = request0
         private val PROF = envLong("KN_PROF", 0) != 0L
         private val STALLS = envLong("KN_STALLS", 0) != 0L  // log passes whose work took > 100 ms   // time split on the stats line (two clock reads per stage)
 
@@ -199,7 +200,10 @@ class Server(private val jwt: Jwt) {
     }
 
     /** Parses one request at rbuf[s, e). Returns bytes consumed, 0 if incomplete, -1 to drop the connection. */
-    private fun request(slot: Int, gen: Int, s: Int, e: Int): Int {
+    private fun request(slot: Int, gen: Int, s: Int, e: Int): Int = if (HDR_STRUCT) request1(slot, gen, s, e) else request0(slot, gen, s, e)
+
+    /** The original two-pass parser (KN_HDR=0): find the blank line, then split every header at its colon. */
+    private fun request0(slot: Int, gen: Int, s: Int, e: Int): Int {
         val b = rbuf
         // End of headers.
         var he = -1
@@ -268,6 +272,94 @@ class Server(private val jwt: Jwt) {
         if (cl > MAX_REQ - (he - s)) return -1
         if (e - s < total) return 0
 
+        try {
+            route(slot, gen, method, ts, pathEnd, authS, authE, he, he + cl, close)
+        } catch (ex: Exception) {
+            println("request failed: $ex")
+            respond(slot, gen, H500, E_500, close)
+        }
+        return total
+    }
+
+    /**
+     * One pass over the head (idea: kotlin-trikeshed-jnorthrup's "parse the headers as a struct, first character,
+     * then verify"): each line is scanned once for its CR; a line is decoded only if its first character and the
+     * colon at the fixed offset of its name say it is one of the headers we use (Content-Length, Authorization,
+     * Connection, Transfer-Encoding); every other line costs the CR scan alone. Values are offsets into rbuf.
+     * Same results as request0 (any case of the names, optional spaces/tabs around values).
+     */
+    private fun request1(slot: Int, gen: Int, s: Int, e: Int): Int {
+        val b = rbuf
+        val CR = '\r'.code.toByte()
+        val SP = ' '.code.toByte()
+        // Request line: method by its first byte, then the target up to the next space.
+        var method = 0
+        var p: Int
+        if (e - s > 4 && b[s] == 'G'.code.toByte() && b[s + 1] == 'E'.code.toByte() && b[s + 2] == 'T'.code.toByte() && b[s + 3] == SP) {
+            method = GET; p = s + 4
+        } else if (e - s > 5 && b[s] == 'P'.code.toByte() && b[s + 1] == 'O'.code.toByte() && b[s + 2] == 'S'.code.toByte() && b[s + 3] == 'T'.code.toByte() && b[s + 4] == SP) {
+            method = POST; p = s + 5
+        } else {
+            p = s
+            while (p < e && b[p] != SP && b[p] != CR) p++
+            p++
+        }
+        val ts = p
+        var pathEnd = -1
+        while (p < e) {
+            val c = b[p]
+            if (c == SP || c == CR) break
+            if (c == '?'.code.toByte() && pathEnd < 0) pathEnd = p
+            p++
+        }
+        val te = p
+        if (pathEnd < 0) pathEnd = te
+        while (p < e && b[p] != CR) p++
+        if (p + 1 >= e) return if (e - s > 16 * 1024) -1 else 0
+        // "HTTP/1.0" ends the line: its '0' is right before the CR
+        val http10 = p - te >= 9 && b[p - 1] == '0'.code.toByte() && b[p - 3] == '1'.code.toByte() && b[p - 4] == '/'.code.toByte()
+        p += 2
+
+        var cl = 0
+        var authS = -1; var authE = -1
+        var close = http10
+        var he: Int
+        while (true) {
+            if (p + 1 >= e) return if (e - s > 16 * 1024) -1 else 0
+            if (b[p] == CR) { he = p + 2; break }               // the blank line
+            var le = p
+            while (le < e && b[le] != CR) le++
+            if (le + 1 >= e) return if (e - s > 16 * 1024) -1 else 0
+            val n = le - p
+            when (b[p].toInt() or 0x20) {
+                'c'.code -> if (n > 14 && b[p + 14] == ':'.code.toByte() && ieq(b, p, "content-length")) {
+                    var vs = p + 15; var ve = le
+                    while (vs < ve && (b[vs] == SP || b[vs] == '\t'.code.toByte())) vs++
+                    while (ve > vs && (b[ve - 1] == SP || b[ve - 1] == '\t'.code.toByte())) ve--
+                    cl = 0
+                    for (k in vs until ve) {
+                        val d = b[k] - '0'.code.toByte()
+                        if (d !in 0..9) return -1
+                        cl = cl * 10 + d
+                        if (cl > MAX_REQ) return -1
+                    }
+                } else if (n > 10 && b[p + 10] == ':'.code.toByte() && ieq(b, p, "connection")) {
+                    if (icontains(b, p + 11, le, "close")) close = true
+                    else if (icontains(b, p + 11, le, "keep-alive")) close = false
+                }
+                'a'.code -> if (n > 13 && b[p + 13] == ':'.code.toByte() && ieq(b, p, "authorization")) {
+                    var vs = p + 14; var ve = le
+                    while (vs < ve && (b[vs] == SP || b[vs] == '\t'.code.toByte())) vs++
+                    while (ve > vs && (b[ve - 1] == SP || b[ve - 1] == '\t'.code.toByte())) ve--
+                    authS = vs; authE = ve
+                }
+                't'.code -> if (n > 17 && b[p + 17] == ':'.code.toByte() && ieq(b, p, "transfer-encoding")) return -1
+            }
+            p = le + 2
+        }
+        val total = he - s + cl
+        if (cl > MAX_REQ - (he - s)) return -1
+        if (e - s < total) return 0
         try {
             route(slot, gen, method, ts, pathEnd, authS, authE, he, he + cl, close)
         } catch (ex: Exception) {

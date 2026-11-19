@@ -56,17 +56,17 @@ KL="systemd-run --user --scope --quiet -p MemoryMax=6G -p MemorySwapMax=0 -p All
 KPID=$!
 ( while kill -0 "$KPID" 2>/dev/null; do echo "$(date +%s) $(rssmb) MB cg $(( $(cat $CG/memory.current) / 1048576 )) MB"; sleep 5; done ) > "$OUT/server-stats.txt" &
 STATP=$!
-sleep "${RAMP%s}"; t0=$(ticks); u0=$(uticks); s0=$(date +%s.%N)
+sleep "${RAMP%s}"; t0=$(ticks); u0=$(uticks); s0=$(date +%s.%N); w0=$(awk '/syscw/{print $2}' /proc/$NSP/io)
 [ -n "${PERF:-}" ] && ( sleep 10; perf record -F 2000 -p "$NSP" -o "$OUT/perf.data" -- sleep 20 > "$OUT/perf.log" 2>&1 ) &
-sleep "${HOLD%s}"; t1=$(ticks); u1=$(uticks); s1=$(date +%s.%N)
+sleep "${HOLD%s}"; t1=$(ticks); u1=$(uticks); s1=$(date +%s.%N); w1=$(awk '/syscw/{print $2}' /proc/$NSP/io)
 RSS=$(rssmb)
 wait "$KPID" || true
 kill $STATP 2>/dev/null || true
 CGPEAK=$(( $(cat "$CG/memory.peak") / 1048576 ))
 echo "load after: $(cut -d' ' -f1-3 /proc/loadavg); io psi: $(head -1 /proc/pressure/io)" >> "$OUT/env.txt"
-python3 -I - "$OUT" "$LABEL" "$VUS" "$t0" "$t1" "$u0" "$u1" "$s0" "$s1" "$(getconf CLK_TCK)" "$RSS" "$IDLE" "$CGPEAK" <<'EOF' | tee -a "$BASE/results.tsv"
+python3 -I - "$OUT" "$LABEL" "$VUS" "$t0" "$t1" "$u0" "$u1" "$s0" "$s1" "$(getconf CLK_TCK)" "$RSS" "$IDLE" "$CGPEAK" "$w0" "$w1" <<'EOF' | tee -a "$BASE/results.tsv"
 import json,sys
-out,label,vus,t0,t1,u0,u1,s0,s1,hz,rss,idle,cgpeak=sys.argv[1:]
+out,label,vus,t0,t1,u0,u1,s0,s1,hz,rss,idle,cgpeak,w0,w1=sys.argv[1:]
 j=json.load(open(out+"/kload.json"))
 h=j["hold"]; wall=float(s1)-float(s0); cpu=(int(t1)-int(t0))/int(hz); ucpu=(int(u1)-int(u0))/int(hz)
 hreqs=h["reqs"] or 1
@@ -74,7 +74,7 @@ us=cpu/hreqs*1e6
 ok="PASS" if j["pass"] else "FAIL"
 print(f"{label}\tVUS={vus}\t{ok}\treqs={j['reqs']}\terr={j['fail_rate']*100:.3f}%\tp95={j['p95_ms']:.1f}\tp99={j['p99_ms']:.1f}\t"
       f"hold_p99={h['p99_ms']:.1f}\tcpu={cpu/wall*100:.0f}%\tus/req={us:.1f}\t(user {ucpu/hreqs*1e6:.1f})\trss={rss}MB\tidle={idle}MB\t"
-      f"cgpeak={cgpeak}MB\tgenstalls={j['gen_loop_stalls']}\tmaxopen={j['max_open']}\t{out.split('/')[-1]}")
+      f"writes/req={(int(w1)-int(w0))/hreqs:.3f}\tcgpeak={cgpeak}MB\tgenstalls={j['gen_loop_stalls']}\tmaxopen={j['max_open']}\t{out.split('/')[-1]}")
 EOF
 cleanup; trap - EXIT
 sleep 1

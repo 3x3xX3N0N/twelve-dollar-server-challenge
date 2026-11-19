@@ -68,7 +68,10 @@ typedef struct ringx {
 } ringx;
 
 static ringx R[MAX_RINGS];
-static int nrings, maxrings, lfd = -1, efd = -1, table_size;
+#define MAX_LISTENERS 8
+static int nrings, maxrings, efd = -1, table_size;
+/* KN_LISTENERS=n (1..8): n SO_REUSEPORT listeners on the port, accepts spread over them (default 1). */
+static int lfds[MAX_LISTENERS], nlisten = 1, lacc[MAX_LISTENERS];
 static int defer_taskrun;   /* IORING_SETUP_DEFER_TASKRUN (completions run only when we enter); KN_DEFER=0 turns it off */
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
@@ -154,8 +157,38 @@ static int ring_create(int r) {
     return 0;
 }
 
+/* Locks this binary's own file-backed mappings (code, read-only data) in RAM: the box has no swap, so near the memory
+ * wall reclaim can only take file pages, and the loop would stall on major faults reading its own code back.
+ * Within the default 8 MB RLIMIT_MEMLOCK (the binary is ~2.6 MB). Idea credit: c-iouring-pavlyhalim,
+ * mojo-iouring-oh-meh, fsharp-uring-delneg. KN_MLOCK=0 turns it off. */
+static void mlock_self(void) {
+    if (getenv("KN_MLOCK") && getenv("KN_MLOCK")[0] == '0') return;
+    char exe[4096];
+    ssize_t n = readlink("/proc/self/exe", exe, sizeof exe - 1);
+    if (n <= 0) return;
+    exe[n] = 0;
+    FILE *f = fopen("/proc/self/maps", "r");
+    if (!f) return;
+    char line[4352];
+    size_t locked = 0;
+    int fails = 0;
+    while (fgets(line, sizeof line, f)) {
+        unsigned long lo, hi;
+        char perm[8];
+        int off = 0;
+        if (sscanf(line, "%lx-%lx %7s %*s %*s %*s %n", &lo, &hi, perm, &off) < 3 || !off) continue;
+        char *path = line + off;
+        path[strcspn(path, "\n")] = 0;
+        if (strcmp(path, exe) != 0 || perm[2] == 'w') continue;   /* our own code and read-only data */
+        if (mlock((void *)lo, hi - lo) == 0) locked += hi - lo; else fails++;
+    }
+    fclose(f);
+    fprintf(stderr, "mlock: %zu KB of the binary locked%s\n", locked / 1024, fails ? " (some mappings failed)" : "");
+}
+
 int ur_init(const char *host, int port, int max_rings) {
     signal(SIGPIPE, SIG_IGN);
+    mlock_self();
     struct rlimit rl;
     if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < rl.rlim_max) {
         rl.rlim_cur = rl.rlim_max;
@@ -168,31 +201,39 @@ int ur_init(const char *host, int port, int max_rings) {
     maxrings = max_rings < 1 ? 1 : max_rings > MAX_RINGS ? MAX_RINGS : max_rings;
     defer_taskrun = !(getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '0');
 
-    lfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
-    if (lfd < 0) { perror("socket"); return -1; }
-    int one = 1, defer = 5;
-    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
-    setsockopt(lfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);   /* accepted sockets inherit it */
-    if (!getenv("KN_NO_DEFER")) setsockopt(lfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &defer, sizeof defer);
+    if (getenv("KN_LISTENERS")) nlisten = atoi(getenv("KN_LISTENERS"));
+    if (nlisten < 1) nlisten = 1;
+    if (nlisten > MAX_LISTENERS) nlisten = MAX_LISTENERS;
     struct sockaddr_in a;
     memset(&a, 0, sizeof a);
     a.sin_family = AF_INET;
     a.sin_port = htons((uint16_t)port);
     if (inet_pton(AF_INET, host, &a.sin_addr) != 1) { fprintf(stderr, "bad HOST %s\n", host); return -1; }
-    /* A restart right after a stop can find the port still in LISTEN: on 6.8 kernels the old process's io_uring is
-     * torn down asynchronously after exit, and its pending multishot accept keeps the old listener alive until then
-     * (seen on a Vultr Ubuntu 24.04 VM, 6.8.0-147: "bind: Address already in use" one second after a stop with ~1k
-     * open connections). SO_REUSEADDR does not cover a listener, so retry for up to 30 s. */
-    for (int tries = 0;; tries++) {
-        if (bind(lfd, (struct sockaddr *)&a, sizeof a) == 0) {
-            if (tries) fprintf(stderr, "bind: port free after %d.%d s\n", tries / 10, tries % 10);
-            break;
+    for (int l = 0; l < nlisten; l++) {
+        int lfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+        if (lfd < 0) { perror("socket"); return -1; }
+        int one = 1, defer = 5;
+        setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+        if (nlisten > 1) setsockopt(lfd, SOL_SOCKET, SO_REUSEPORT, &one, sizeof one);
+        setsockopt(lfd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);   /* accepted sockets inherit it */
+        if (!getenv("KN_NO_DEFER")) setsockopt(lfd, IPPROTO_TCP, TCP_DEFER_ACCEPT, &defer, sizeof defer);
+        /* A restart right after a stop can find the port still in LISTEN: on 6.8 kernels the old process's io_uring
+         * is torn down asynchronously after exit, and its pending accepts keep the old listener alive until then
+         * (seen on a Vultr Ubuntu 24.04 VM, 6.8.0-147: "bind: Address already in use" one second after a stop with
+         * ~1k open connections). SO_REUSEADDR does not cover a listener, so retry for up to 30 s. (With several
+         * SO_REUSEPORT listeners the old process's listener does not block the bind; only the first one retries.) */
+        for (int tries = 0;; tries++) {
+            if (bind(lfd, (struct sockaddr *)&a, sizeof a) == 0) {
+                if (tries) fprintf(stderr, "bind: port free after %d.%d s\n", tries / 10, tries % 10);
+                break;
+            }
+            if (errno != EADDRINUSE || tries >= 300) { perror("bind"); return -1; }
+            if (tries == 0) fprintf(stderr, "bind: address in use, retrying for up to 30 s\n");
+            usleep(100 * 1000);
         }
-        if (errno != EADDRINUSE || tries >= 300) { perror("bind"); return -1; }
-        if (tries == 0) fprintf(stderr, "bind: address in use, retrying for up to 30 s\n");
-        usleep(100 * 1000);
+        if (listen(lfd, 65535) < 0) { perror("listen"); return -1; }
+        lfds[l] = lfd;
     }
-    if (listen(lfd, 65535) < 0) { perror("listen"); return -1; }
     if (ring_create(0)) return -1;
     nrings = 1;
     return 0;
@@ -308,9 +349,12 @@ static void top_up_accepts(void) {
         ringx *x = &R[r];
         int room = x->table - FD_MARGIN - x->used - x->accepts;
         while (room-- > 0 && inflight < ACCEPT_DEPTH) {
+            int l = 0;   /* the listener with the fewest accepts in flight */
+            for (int k = 1; k < nlisten; k++) if (lacc[k] < lacc[l]) l = k;
+            lacc[l]++;
             struct io_uring_sqe *s = sqe_of(r);
-            io_uring_prep_accept_direct(s, lfd, 0, 0, 0, IORING_FILE_INDEX_ALLOC);
-            io_uring_sqe_set_data64(s, ud(K_ACCEPT, r, 0, 0));
+            io_uring_prep_accept_direct(s, lfds[l], 0, 0, 0, IORING_FILE_INDEX_ALLOC);
+            io_uring_sqe_set_data64(s, ud(K_ACCEPT, r, l, 0));
             x->accepts++; inflight++;
         }
     }
@@ -353,6 +397,7 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
     switch (kind) {
     case K_ACCEPT:
         x->accepts--;
+        lacc[idx]--;
         if (res >= 0) {
             conn *c = &x->conns[res];
             c->gen++; c->open = 1; c->sending = c->close_after = c->shut = c->rearm = 0;
