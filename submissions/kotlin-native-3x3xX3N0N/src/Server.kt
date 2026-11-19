@@ -57,10 +57,11 @@ class Server(private val jwt: Jwt) {
         // Group-commit window and loop pacing (as the JVM entry; see README for the measurements).
         private val WRITE_WINDOW_NS = envLong("KN_WINDOW_US", 2000) * 1000
         private val BATCH_MAX = envLong("KN_BATCH_MAX", 64).toInt()
-        // Pacing is off by default (PACE_NR 1): waiting for 32 completions after a light pass measured 21.6 -> 19.4 and
-        // 30.0 -> 22.0 us/req worse at 160k users (LOCAL), and a wait_nr > 1 on ring 0 delays completions of the other
-        // rings (accepts on ring 1+ stalled in a small-table test). Kept as a knob.
-        private val PACE_NR = envLong("KN_PACE_NR", 1).toInt()     // after a light pass: wait for this many completions
+        // Batch wake (idea: kotlin-trikeshed-jnorthrup, rust-iouring-kensac): after a pass with fewer than PACE_NR
+        // completions the next io_uring_enter waits for PACE_NR completions or PACE_US (or the group-commit
+        // deadline), with DEFER_TASKRUN rings (csrc/uring.c), so one enter serves many sockets. Measured 160k users
+        // (LOCAL, netns): 19.1 -> 16.6 us/req, p95 +1 ms. KN_PACE_NR=1 turns it off.
+        private val PACE_NR = envLong("KN_PACE_NR", 256).toInt()   // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
         private val STATS = envLong("KN_STATS", 0) != 0L
         private val PROF = envLong("KN_PROF", 0) != 0L
@@ -146,7 +147,7 @@ class Server(private val jwt: Jwt) {
             if (STATS && kn_now_ns() - lastStats > 10_000_000_000L) {
                 lastStats = kn_now_ns()
                 println("stats: open=${ur_stat(0)} rings=${ur_stat(3)} enobufs=${ur_stat(1)} rearms=${ur_stat(4)} " +
-                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)}" +
+                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)}" +
                     if (PROF) " | ms: poll+wait=${tPoll / 1000000} dbread=${tRead / 1000000} (${nReads} reads) " +
                         "batch=${tBatch / 1000000} loop=${tAll / 1000000} passes=$nPasses" else "")
                 for (r in 0 until 8) if (ur_stat(100 + r) < 0) break

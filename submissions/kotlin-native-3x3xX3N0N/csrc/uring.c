@@ -69,7 +69,7 @@ typedef struct ringx {
 
 static ringx R[MAX_RINGS];
 static int nrings, maxrings, lfd = -1, efd = -1, table_size;
-static int defer_taskrun;   /* KN_DEFER=1: IORING_SETUP_DEFER_TASKRUN (completions run only when we enter) */
+static int defer_taskrun;   /* IORING_SETUP_DEFER_TASKRUN (completions run only when we enter); KN_DEFER=0 turns it off */
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
@@ -166,7 +166,7 @@ int ur_init(const char *host, int port, int max_rings) {
     if (getenv("KN_TABLE")) table_size = atoi(getenv("KN_TABLE"));   /* testing the ring spill with small tables */
     if (table_size < 2 * FD_MARGIN) table_size = 2 * FD_MARGIN;
     maxrings = max_rings < 1 ? 1 : max_rings > MAX_RINGS ? MAX_RINGS : max_rings;
-    defer_taskrun = getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '1';
+    defer_taskrun = !(getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '0');
 
     lfd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (lfd < 0) { perror("socket"); return -1; }

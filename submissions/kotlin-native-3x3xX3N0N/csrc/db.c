@@ -111,6 +111,55 @@ void db_pass_end(void) {
     if (rd_open && (!keep_snapshot || atomic_load_explicit(&ckpt_want, memory_order_relaxed))) rd_end();
 }
 
+/* ------------------------------------------------------------------ page cache: pcache1 with its own xRekey
+ * SQLite's own pcache1 through the public SQLITE_CONFIG_PCACHE2 interface, with one method replaced. A B-tree split
+ * that renumbers pages swaps two of them through a temporary page number, the lock-byte page's (262,145 for 4 KB
+ * pages). pcache1 remembers the largest key it has held until a truncate walks the cache, so after each such swap
+ * the next commit's truncate (drop pages past the end of the file) scanned the whole hash table to find nothing.
+ * Here the page waits out the swap under key 0, which SQLite never gives a page; everything else is pcache1's.
+ * Idea credit: fsharp-uring-delneg (xRekey), c-iouring-pavlyhalim (the diagnosis). KN_PCACHE=0 = stock pcache1. */
+static sqlite3_pcache_methods2 pc_base;
+static struct { sqlite3_pcache *c; unsigned lockbyte; sqlite3_pcache_page *parked; } pc_tab[64];
+static pthread_mutex_t pc_mu = PTHREAD_MUTEX_INITIALIZER;
+static int64_t n_parked;
+
+static sqlite3_pcache *pc_create(int szPage, int szExtra, int bPurgeable) {
+    sqlite3_pcache *c = pc_base.xCreate(szPage, szExtra, bPurgeable);
+    if (!c) return 0;
+    pthread_mutex_lock(&pc_mu);
+    for (int i = 0; i < 64; i++)
+        if (!pc_tab[i].c) { pc_tab[i].c = c; pc_tab[i].lockbyte = (unsigned)(PENDING_BYTE / szPage) + 1; pc_tab[i].parked = 0; break; }
+    pthread_mutex_unlock(&pc_mu);
+    return c;
+}
+
+static void pc_destroy(sqlite3_pcache *c) {
+    pthread_mutex_lock(&pc_mu);
+    for (int i = 0; i < 64; i++) if (pc_tab[i].c == c) { pc_tab[i].c = 0; break; }
+    pthread_mutex_unlock(&pc_mu);
+    pc_base.xDestroy(c);
+}
+
+/* Each cache belongs to one connection, used by one thread at a time; the table lookup is a short linear scan. */
+static void pc_rekey(sqlite3_pcache *c, sqlite3_pcache_page *pg, unsigned oldKey, unsigned newKey) {
+    for (int i = 0; i < 64; i++) {
+        if (pc_tab[i].c != c) continue;
+        if (newKey == pc_tab[i].lockbyte && !pc_tab[i].parked) { pc_tab[i].parked = pg; n_parked++; newKey = 0; }
+        else if (oldKey == pc_tab[i].lockbyte && pc_tab[i].parked == pg) { pc_tab[i].parked = 0; oldKey = 0; }
+        break;
+    }
+    pc_base.xRekey(c, pg, oldKey, newKey);
+}
+
+static void pc_install(void) {
+    if (getenv("KN_PCACHE") && getenv("KN_PCACHE")[0] == '0') return;
+    sqlite3_pcache_methods2 m;
+    if (sqlite3_config(SQLITE_CONFIG_GETPCACHE2, &pc_base) != SQLITE_OK) return;
+    m = pc_base;
+    m.xCreate = pc_create; m.xDestroy = pc_destroy; m.xRekey = pc_rekey;
+    if (sqlite3_config(SQLITE_CONFIG_PCACHE2, &m) != SQLITE_OK) fprintf(stderr, "pcache wrapper not installed\n");
+}
+
 /* ------------------------------------------------------------------ open */
 #define POST_JSON \
     "json_object('id',p.id,'body',p.body,'created_at',p.created_at,'author',u.username," \
@@ -119,6 +168,7 @@ void db_pass_end(void) {
 int db_open(const char *path, const char *vfs, int btree, char *err, int errcap) {
     snprintf(g_path, sizeof g_path, "%s", path);
     snprintf(g_vfs, sizeof g_vfs, "%s", vfs ? vfs : "");
+    pc_install();
     keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
     /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
      * ~400k connections the 2 GB box is short of memory, not CPU. */
@@ -430,6 +480,7 @@ int64_t db_stat(int which) {
     case 0: return n_bt;
     case 1: return n_sql;
     case 2: return n_snap;
+    case 3: return n_parked;
     default: return 0;
     }
 }
