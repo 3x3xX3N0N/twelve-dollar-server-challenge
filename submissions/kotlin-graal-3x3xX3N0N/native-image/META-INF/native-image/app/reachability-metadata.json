@@ -1,0 +1,173 @@
+{
+ "foreign": {
+  "downcalls": [
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "jint",
+     "void*",
+     "void*",
+     "void*",
+     "jint",
+     "jint",
+     "jint",
+     "jlong"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "jint",
+     "void*"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "jint",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "jlong",
+     "void*",
+     "jint",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "jlong",
+     "jlong"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "jlong",
+     "void*",
+     "jint",
+     "jint",
+     "void*",
+     "jint",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "jint",
+     "void*",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "void*",
+     "jint",
+     "void*",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "void*",
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jlong",
+    "parameterTypes": [
+     "jint"
+    ],
+    "options": {
+     "critical": {
+      "allowHeapAccess": true
+     }
+    }
+   },
+   {
+    "returnType": "jint",
+    "parameterTypes": [
+     "jint",
+     "jlong"
+    ]
+   }
+  ]
+ }
+}
