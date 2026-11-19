@@ -54,9 +54,11 @@ class Server(private val jwt: Jwt) {
         private const val MAX_REQ = 60 * 1024
         private const val HEAD_ROOM = 160    // room left for the status line + headers before a body from SQLite
 
-        // Group-commit window and loop pacing (as the JVM entry; see README for the measurements).
-        private val WRITE_WINDOW_NS = envLong("KN_WINDOW_US", 2000) * 1000
-        private val BATCH_MAX = envLong("KN_BATCH_MAX", 64).toInt()
+        // Group-commit window: a batch closes once its oldest write has waited 20 ms (or 1,024 are queued). Reads never
+        // wait for it. Measured 160k users (LOCAL): committer thread 1.4-1.7 -> 0.8 us/req against 2 ms / 64, p95 2.3 ->
+        // 8.4 ms (the limit is 500 ms); 10 ms and 40 ms were no better for CPU. Idea: go-iouring-DblD, fsharp-uring-delneg.
+        private val WRITE_WINDOW_NS = envLong("KN_WINDOW_US", 20000) * 1000
+        private val BATCH_MAX = envLong("KN_BATCH_MAX", 1024).toInt()
         // Batch wake (idea: kotlin-trikeshed-jnorthrup, rust-iouring-kensac): after a pass with fewer than PACE_NR
         // completions the next io_uring_enter waits for PACE_NR completions or PACE_US (or the group-commit
         // deadline), with DEFER_TASKRUN rings (csrc/uring.c), so one enter serves many sockets. Measured 160k users
@@ -148,7 +150,7 @@ class Server(private val jwt: Jwt) {
             if (STATS && kn_now_ns() - lastStats > 10_000_000_000L) {
                 lastStats = kn_now_ns()
                 println("stats: open=${ur_stat(0)} rings=${ur_stat(3)} enobufs=${ur_stat(1)} rearms=${ur_stat(4)} " +
-                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)}" +
+                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)} walw=${db_stat(4)} walpw=${db_stat(5)}" +
                     if (PROF) " | ms: poll+wait=${tPoll / 1000000} dbread=${tRead / 1000000} (${nReads} reads) " +
                         "batch=${tBatch / 1000000} loop=${tAll / 1000000} passes=$nPasses" else "")
                 for (r in 0 until 8) if (ur_stat(100 + r) < 0) break

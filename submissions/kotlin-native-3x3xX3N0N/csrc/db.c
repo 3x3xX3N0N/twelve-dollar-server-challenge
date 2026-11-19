@@ -160,6 +160,125 @@ static void pc_install(void) {
     if (sqlite3_config(SQLITE_CONFIG_PCACHE2, &m) != SQLITE_OK) fprintf(stderr, "pcache wrapper not installed\n");
 }
 
+/* ------------------------------------------------------------------ WAL writes: one pwrite per commit
+ * A VFS of its own over the base VFS (public sqlite3_vfs API) that changes only the WAL file's writes. SQLite writes
+ * each frame as two writes (24-byte header, then the page), so a commit of n frames costs 2n pwrite calls. Here
+ * writes that continue where the previous one ended are gathered in a buffer, and the buffer goes to the file when
+ * the commit frame's page arrives (its header's database-size field is non-zero), inside SQLite's own xWrite call:
+ * so the commit is in the kernel before SQLite publishes it in the WAL index and before COMMIT returns (rule 6
+ * holds exactly as with the stock VFS). Any other write, and every read, sync, truncate, lock, size query, file
+ * control and close writes the buffer first. Pieces of at most 128 KiB - 1 (the unix VFS takes at most 0x1ffff
+ * bytes per write). Every other file (database, -shm) is the base VFS's own object, untouched.
+ * Idea credit: c-iouring-pavlyhalim, fsharp-uring-delneg, goose-iouring-ahmadsh2007. KN_WALVFS=0 = stock VFS. */
+typedef struct walf {
+    sqlite3_file base;
+    uint8_t *buf;
+    sqlite3_int64 off;        /* file offset of buf[0] */
+    int len, cap, commit;     /* commit: the last write was a commit frame's header */
+    sqlite3_file *real;       /* the base VFS's file object, right after this struct */
+} walf;
+
+static sqlite3_vfs wv_vfs, *wv_base;
+static sqlite3_io_methods wv_io;
+static int64_t n_wal_writes, n_wal_flushes;
+
+static int wv_flush(walf *f) {
+    int rc = SQLITE_OK, done = 0;
+    while (rc == SQLITE_OK && done < f->len) {
+        int n = f->len - done;
+        if (n > 0x1ffff) n = 0x1ffff;
+        rc = f->real->pMethods->xWrite(f->real, f->buf + done, n, f->off + done);
+        done += n;
+        n_wal_flushes++;
+    }
+    f->len = 0; f->commit = 0;
+    return rc;
+}
+
+static int wv_write(sqlite3_file *pf, const void *p, int amt, sqlite3_int64 off) {
+    walf *f = (walf *)pf;
+    n_wal_writes++;
+    if (f->len && off != f->off + f->len) { int rc = wv_flush(f); if (rc) return rc; }
+    if (f->len + amt > f->cap) {
+        int cap = f->cap ? f->cap : 1 << 18;
+        while (cap < f->len + amt) cap *= 2;
+        if (cap > (16 << 20)) {   /* very large transaction: write what we have and this piece directly */
+            int rc = wv_flush(f);
+            return rc ? rc : f->real->pMethods->xWrite(f->real, p, amt, off);
+        }
+        uint8_t *b = realloc(f->buf, (size_t)cap);
+        if (!b) { int rc = wv_flush(f); return rc ? rc : f->real->pMethods->xWrite(f->real, p, amt, off); }
+        f->buf = b; f->cap = cap;
+    }
+    if (!f->len) f->off = off;
+    memcpy(f->buf + f->len, p, (size_t)amt);
+    f->len += amt;
+    if (f->commit) return wv_flush(f);            /* the commit frame's page: the whole commit goes out now */
+    const uint8_t *h = p;
+    f->commit = amt == WAL_FRAME_HDRSIZE && (h[4] | h[5] | h[6] | h[7]) != 0;
+    return SQLITE_OK;
+}
+
+#define WV_FLUSHED(f) do { if ((f)->len) { int rc_ = wv_flush(f); if (rc_) return rc_; } } while (0)
+static int wv_close(sqlite3_file *pf) {
+    walf *f = (walf *)pf;
+    int rc = f->len ? wv_flush(f) : SQLITE_OK;
+    int rc2 = f->real->pMethods ? f->real->pMethods->xClose(f->real) : SQLITE_OK;
+    free(f->buf); f->buf = 0; f->cap = 0;
+    return rc ? rc : rc2;
+}
+static int wv_read(sqlite3_file *pf, void *p, int amt, sqlite3_int64 off) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xRead(f->real, p, amt, off); }
+static int wv_truncate(sqlite3_file *pf, sqlite3_int64 size) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xTruncate(f->real, size); }
+static int wv_sync(sqlite3_file *pf, int flags) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xSync(f->real, flags); }
+static int wv_size(sqlite3_file *pf, sqlite3_int64 *size) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xFileSize(f->real, size); }
+static int wv_lock(sqlite3_file *pf, int l) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xLock(f->real, l); }
+static int wv_unlock(sqlite3_file *pf, int l) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xUnlock(f->real, l); }
+static int wv_reserved(sqlite3_file *pf, int *out) { walf *f = (walf *)pf; return f->real->pMethods->xCheckReservedLock(f->real, out); }
+static int wv_fcntl(sqlite3_file *pf, int op, void *arg) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xFileControl(f->real, op, arg); }
+static int wv_sector(sqlite3_file *pf) { walf *f = (walf *)pf; return f->real->pMethods->xSectorSize(f->real); }
+static int wv_devchar(sqlite3_file *pf) { walf *f = (walf *)pf; return f->real->pMethods->xDeviceCharacteristics(f->real); }
+static int wv_shmmap(sqlite3_file *pf, int i, int sz, int ext, void volatile **pp) { walf *f = (walf *)pf; return f->real->pMethods->xShmMap(f->real, i, sz, ext, pp); }
+static int wv_shmlock(sqlite3_file *pf, int o, int n, int fl) { walf *f = (walf *)pf; return f->real->pMethods->xShmLock(f->real, o, n, fl); }
+static void wv_shmbarrier(sqlite3_file *pf) { walf *f = (walf *)pf; f->real->pMethods->xShmBarrier(f->real); }
+static int wv_shmunmap(sqlite3_file *pf, int del) { walf *f = (walf *)pf; return f->real->pMethods->xShmUnmap(f->real, del); }
+static int wv_fetch(sqlite3_file *pf, sqlite3_int64 off, int amt, void **pp) { walf *f = (walf *)pf; WV_FLUSHED(f); return f->real->pMethods->xFetch(f->real, off, amt, pp); }
+static int wv_unfetch(sqlite3_file *pf, sqlite3_int64 off, void *p) { walf *f = (walf *)pf; return f->real->pMethods->xUnfetch(f->real, off, p); }
+
+static int wv_open(sqlite3_vfs *vfs, const char *name, sqlite3_file *pf, int flags, int *outFlags) {
+    (void)vfs;
+    if (!(flags & SQLITE_OPEN_WAL)) return wv_base->xOpen(wv_base, name, pf, flags, outFlags);   /* the base's own object */
+    walf *f = (walf *)pf;
+    memset(f, 0, sizeof *f);
+    f->real = (sqlite3_file *)((uint8_t *)pf + ((sizeof(walf) + 15) & ~(size_t)15));
+    int rc = wv_base->xOpen(wv_base, name, f->real, flags, outFlags);
+    if (rc != SQLITE_OK) { f->base.pMethods = 0; return rc; }
+    const sqlite3_io_methods *m = f->real->pMethods;
+    static pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&mu);
+    if (!wv_io.xWrite) wv_io = (sqlite3_io_methods){m->iVersion, wv_close, wv_read, wv_write, wv_truncate, wv_sync, wv_size, wv_lock,
+                                 wv_unlock, wv_reserved, wv_fcntl, wv_sector, wv_devchar, wv_shmmap, wv_shmlock,
+                                 wv_shmbarrier, wv_shmunmap, wv_fetch, wv_unfetch};
+    pthread_mutex_unlock(&mu);
+    f->base.pMethods = &wv_io;
+    return SQLITE_OK;
+}
+
+/* Registers "knwal" over the base VFS (name, or NULL = the default). Returns its name, or NULL (stock VFS). */
+static const char *wv_install(const char *base) {
+    if (getenv("KN_WALVFS") && getenv("KN_WALVFS")[0] == '0') return 0;
+    wv_base = sqlite3_vfs_find(base && base[0] ? base : 0);
+    if (!wv_base) return 0;
+    wv_vfs = *wv_base;
+    wv_vfs.zName = "knwal";
+    wv_vfs.szOsFile = (int)((sizeof(walf) + 15) & ~(size_t)15) + wv_base->szOsFile;
+    wv_vfs.pNext = 0;
+    wv_vfs.xOpen = wv_open;
+    /* every other method (delete, access, full pathname, randomness, sleep, time, ...) is the base's: they get
+     * &wv_vfs as their first argument, and the unix VFS methods read only pAppData from it, which is the base's */
+    if (sqlite3_vfs_register(&wv_vfs, 0) != SQLITE_OK) return 0;
+    return wv_vfs.zName;
+}
+
 /* ------------------------------------------------------------------ open */
 #define POST_JSON \
     "json_object('id',p.id,'body',p.body,'created_at',p.created_at,'author',u.username," \
@@ -169,6 +288,8 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     snprintf(g_path, sizeof g_path, "%s", path);
     snprintf(g_vfs, sizeof g_vfs, "%s", vfs ? vfs : "");
     pc_install();
+    const char *wv = wv_install(g_vfs);
+    if (wv) snprintf(g_vfs, sizeof g_vfs, "%s", wv);
     keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
     /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
      * ~400k connections the 2 GB box is short of memory, not CPU. */
@@ -403,6 +524,7 @@ static void run_batch(wbatch *b) {
 
 static void *wq_main(void *arg) {
     (void)arg;
+    pthread_setname_np(pthread_self(), "kn-commit");
     for (;;) {
         pthread_mutex_lock(&wq_mu);
         while (wq_state != 1) pthread_cond_wait(&wq_cv, &wq_mu);
@@ -481,6 +603,8 @@ int64_t db_stat(int which) {
     case 1: return n_sql;
     case 2: return n_snap;
     case 3: return n_parked;
+    case 4: return n_wal_writes;
+    case 5: return n_wal_flushes;
     default: return 0;
     }
 }
@@ -499,6 +623,7 @@ static int64_t now_ns(void) {
 
 static void *ckpt_main(void *arg) {
     (void)arg;
+    pthread_setname_np(pthread_self(), "kn-ckpt");
     /* nice 5 for this thread only: at 19 it starves under saturation, at 0 it competes with the loop as an equal. */
     setpriority(PRIO_PROCESS, (id_t)syscall(SYS_gettid), 5);
     sqlite3 *c = 0;
