@@ -48,6 +48,8 @@ class Server(private val jwt: Jwt) {
 
     companion object {
         private const val MAX_EV = 4096
+        // Events handled per pass (bounded pass): the rest stay in the completion queue for the next pass.
+        private val PASS_EV = envLong("KN_MAX_EV", MAX_EV.toLong()).toInt().coerceIn(64, MAX_EV)
         private const val NSLOT = 8 shl 16
         private const val GET = 1
         private const val POST = 2
@@ -60,9 +62,10 @@ class Server(private val jwt: Jwt) {
         private val WRITE_WINDOW_NS = envLong("KN_WINDOW_US", 20000) * 1000
         private val BATCH_MAX = envLong("KN_BATCH_MAX", 1024).toInt()
         // Batch wake (idea: kotlin-trikeshed-jnorthrup, rust-iouring-kensac): after a pass with fewer than PACE_NR
-        // completions the next io_uring_enter waits for PACE_NR completions or PACE_US (or the group-commit
-        // deadline), with DEFER_TASKRUN rings (csrc/uring.c), so one enter serves many sockets. Measured 160k users
-        // (LOCAL, netns): 19.1 -> 16.6 us/req, p95 +1 ms. KN_PACE_NR=1 turns it off.
+        // completions the next io_uring_enter on ring 0 waits for PACE_NR completions or PACE_US (or the group-commit
+        // deadline); all rings use DEFER_TASKRUN and the secondary rings are collected after that wait (csrc/uring.c).
+        // Measured 160k users (LOCAL, netns): loop passes 8.4k -> 0.7k per second, 15.8 -> 14.7 and 18.4 -> 16.3
+        // us/req, p95 7.5 -> 11-14 ms. KN_PACE_NR=1 KN_DEFER=0 = the old loop.
         private val PACE_NR = envLong("KN_PACE_NR", 256).toInt()   // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
         private val STATS = envLong("KN_STATS", 0) != 0L
@@ -117,7 +120,7 @@ class Server(private val jwt: Jwt) {
                 }
             }
             val t0 = kn_now_ns()
-            val n = ur_poll(evs, MAX_EV, waitNr, timeoutUs)
+            val n = ur_poll(evs, PASS_EV, waitNr, timeoutUs)
             val t1 = kn_now_ns()
             for (i in 0 until n) {
                 val e = evs[i]

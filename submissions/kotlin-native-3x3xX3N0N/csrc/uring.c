@@ -42,6 +42,7 @@
 #define ACCEPT_DEPTH 512
 #define FD_MARGIN 256
 #define REARM_MAX 256
+#define DEFER_IDLE_US 1000   /* longest sleep on ring 0 while secondary rings (DEFER_TASKRUN) exist */
 
 enum { K_ACCEPT = 1, K_RECV = 2, K_SEND = 3, K_CLOSE = 4, K_SHUT = 5, K_EVFD = 6, K_WATCH = 7 };
 
@@ -121,6 +122,10 @@ static struct io_uring_buf_ring *buf_ring(struct io_uring *ring) {
 static int ring_create(int r) {
     struct io_uring_params p;
     memset(&p, 0, sizeof p);
+    /* DEFER_TASKRUN: a ring posts its completions only when the loop enters it, in one batch per pass. A secondary
+     * ring then never signals the eventfd while the loop sleeps on ring 0, so with more than one ring ur_poll never
+     * sleeps longer than DEFER_IDLE_US and enters every ring each pass (without that cap an idle server left
+     * connections accepted by ring 1 unanswered: test-rings.sh). */
     p.flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_CQSIZE |
               (defer_taskrun ? IORING_SETUP_DEFER_TASKRUN : IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
     p.cq_entries = CQ_ENTRIES;
@@ -444,34 +449,41 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
     }
 }
 
-static int any_ready(void) {
-    for (int r = 0; r < nrings; r++)
-        if (io_uring_cq_ready(&R[r].ring)) return 1;
-    return 0;
-}
+
+static int backlog;   /* the last pass left completions in a queue (event array full) */
 
 int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
     g_evs = evs; g_nev = 0; g_max = max;
     if (!accept_failed) top_up_accepts();
     accept_failed = 0;
+    /* 1. Hand the secondary rings their new requests (sends of the last pass) before sleeping. */
     for (int r = 1; r < nrings; r++) {
-        if (defer_taskrun) io_uring_submit_and_get_events(&R[r].ring);   /* also runs its deferred completions */
-        else if (R[r].dirty || io_uring_sq_ready(&R[r].ring)) io_uring_submit(&R[r].ring);
+        if (R[r].dirty || io_uring_sq_ready(&R[r].ring)) io_uring_submit(&R[r].ring);
         R[r].dirty = 0;
     }
+    /* 2. Sleep on ring 0 alone: wait_nr completions or timeout_us (batch wake). Completions of the secondary rings
+     *    are not looked at here, or they would cut every wait short once a second ring exists. */
     struct io_uring_cqe *cqe;
-    if (any_ready()) io_uring_submit(&R[0].ring);
+    if (defer_taskrun && nrings > 1 && (timeout_us < 0 || timeout_us > DEFER_IDLE_US)) {
+        timeout_us = DEFER_IDLE_US;
+        if (wait_nr < 1) wait_nr = 1;
+    }
+    if (backlog || io_uring_cq_ready(&R[0].ring)) io_uring_submit(&R[0].ring);
     else if (timeout_us < 0) io_uring_submit_and_wait(&R[0].ring, 1);
     else {
         struct __kernel_timespec ts = {timeout_us / 1000000, (timeout_us % 1000000) * 1000};
         io_uring_submit_and_wait_timeout(&R[0].ring, &cqe, (unsigned)(wait_nr < 1 ? 1 : wait_nr), &ts, 0);
     }
     R[0].dirty = 0;
+    /* 3. Collect what the secondary rings completed meanwhile (with DEFER_TASKRUN they post only when entered). */
+    if (defer_taskrun)
+        for (int r = 1; r < nrings; r++) io_uring_get_events(&R[r].ring);
     /* A CQE can add up to two events (a close emits one); keep room. */
+    backlog = 0;
     for (int r = 0; r < nrings; r++) {
         unsigned head, n = 0;
         io_uring_for_each_cqe(&R[r].ring, head, cqe) {
-            if (g_nev + 2 > g_max) break;
+            if (g_nev + 2 > g_max) { backlog = 1; break; }
             on_cqe(r, cqe);
             n++;
             st_cqe[r]++;
