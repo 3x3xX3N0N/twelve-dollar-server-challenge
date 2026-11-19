@@ -10,7 +10,7 @@ transport and SQLite B-tree read paths, `csrc/`) through the Java Foreign Functi
 | Language | Kotlin 2.4.21 (JVM target 25) |
 | Runtime | **GraalVM Community 25.5.5 native-image** (JDK 25.0.5), Serial GC, 96 MB heap. `KG_MODE=jit`: the same jar on the GraalVM JDK with the Graal JIT |
 | Framework | none (`src/Server.kt`) |
-| Native calls | `java.lang.foreign` (FFM) downcalls into `build/libkn.so` (`csrc/`, built by `build.sh` with gcc) |
+| Native calls | `java.lang.foreign` (FFM) downcalls into `build/libkn.so` (`csrc/`, built by `build.sh` with gcc, **profile-guided: trained during the build** on a synthetic database) |
 | io_uring | liburing 2.9 (MIT), fetched by `build.sh` at its release tag, sha256-checked, linked into `libkn.so` |
 | SQLite | 3.54.1 amalgamation, unchanged, SHA3-256-checked against sqlite.org, compiled into `csrc/db.c` |
 | Nginx or direct | **Direct**: serves `HOST:PORT` itself (`0.0.0.0:80` on the benchmark box) |
@@ -56,10 +56,25 @@ hashed once at start (own SHA-256), `exp` required, every token verified, the bo
 points), status codes, the group-commit window (2 ms or 64 writes) and answering after COMMIT.
 
 **Build flags.** C: `-O3 -march=native -mprefer-vector-width=256` (built on the box, for the box; 256-bit vectors
-so Cascade Lake never runs AVX-512 code). native-image: `--gc=serial -march=x86-64-v3 -O2`, builder heap 800 MB.
+so Cascade Lake never runs AVX-512 code), with gcc profile-guided optimisation (below). native-image: `--gc=serial -march=x86-64-v3 -O2`, builder heap 800 MB.
 (`--no-fallback` is deprecated in GraalVM 25.5 and has no effect: there is no fallback image any more.)
 SQLite build options and pragmas: as the Kotlin/Native entry (`SQLITE_THREADSAFE=2`, `SQLITE_ENABLE_QPSG`,
 `mmap_size=0`, 64 MiB cache, `wal_autocheckpoint=0`, ...).
+
+**Profile-guided C shim (default; `KG_CPGO=0` turns it off).** `build.sh` builds `libkn.so` with
+`-fprofile-generate`, builds the native image, then records the profile **on the box, during the build**:
+`train/mkdb.c` writes a scratch database (the challenge schema, 20,000 users, 50,000 posts, ~200,000 likes of
+random rows, none of the seed), the server runs on it on 127.0.0.1 (`KG_TRAIN_PORT`, default 3999), and the training
+client `train/Train.kt` (on the GraalVM JDK, 64 keep-alive connections) sends 200,000 requests in the load test's
+mix (feed, a post from that feed, 15 % likes, 2 % new posts) plus the test suite's error cases now and then. The
+server is stopped with SIGTERM (the profile is written at exit) and `libkn.so` is rebuilt with `-fprofile-use`. No
+profile is committed. If the training fails or times out (`KG_TRAIN_TIMEOUT`, 900 s), the build says so and falls
+back to the plain build. Cost: ~1 min of build time (12 s of it training, LOCAL, one core).
+
+Native-image PGO (`KG_PGO=1`, Oracle GraalVM only, with `KG_GRAAL=oracle`) is a knob, **not the default, and it
+does not fit the box**: the instrumented image runs out of builder heap at 800 MB and 1,050 MB, and with 2 GB it
+peaks at 2.2 GB RSS. It would not have helped anyway (see the steps table): Oracle GraalVM 25.0.4 cannot initialize
+the FFM handles at build time, and that alone doubles the Kotlin side's cost.
 
 ## Measured (LOCAL, relative only)
 
@@ -72,6 +87,11 @@ core is faster than the droplet's vCPU and loopback is not a NIC: these numbers 
 
 | Users | Build | Result | CPU µs/req | p95 / p99 | RSS | cgroup peak |
 |---|---|---|---|---|---|---|
+| 160,000 | **native-image + C PGO (default)**, interleaved with the next row | PASS (×3) | 19.3, 18.8, 20.4 (user 6.7-7.3) | 1.3-1.9 / 2.3-3.0 ms | 53 MB | 680-689 MB |
+| 160,000 | native-image, no C PGO (b1 default), interleaved | PASS (×3) | 19.8, 20.9, 19.7 (user 7.4-7.9) | 1.3-2.0 / 2.3-3.5 ms | 53-54 MB | 680-688 MB |
+| 448,000 | **native-image + C PGO (default)**, interleaved | PASS (×2) | 15.8, 13.2 | 2.1-45 / 33-185 ms | 81-89 MB | 1,830-1,877 MB |
+| 448,000 | native-image, no C PGO, interleaved | PASS (×2) | 15.3, 13.5 | 2.0-102 / 23-179 ms | 83-84 MB | 1,829-1,839 MB |
+| 480,000 | native-image + C PGO (default) | FAIL (p99 1.4 s, at the 2 GB edge) | 12.4 | 8.3 / 1,188 ms | 86 MB | 1,967 MB |
 | 160,000 | native-image | PASS (×10) | 17.7-18.9 (one outlier 21.6); final build 17.7 | 1.1-1.9 / 2.3-3.1 ms | 54-86 MB (idle 11-12) | 680-722 MB |
 | 160,000 | Graal JIT (`KG_MODE=jit`) | PASS (×4) | 17.6-19.7 | 1.2-2.1 / 2.3-20 ms | 162-370 MB (idle 141-365) | 770-1,000 MB |
 | 160,000 | Kotlin/Native entry, same rig, interleaved | PASS (×2) | 18.0, 19.8 | 1.2-1.5 / 2.3-2.4 ms | 60 MB | 690 MB |
@@ -101,15 +121,24 @@ Steps (each kept only if it helped):
 | Blocking wait as a non-critical downcall | SIGTERM exit hung (no safepoint) → clean exit, restart in 0.14 s | yes (correctness) |
 | Pacing `KN_PACE_NR=256 KN_PACE_US=1000` (wait for 256 completions or 1 ms after a light pass) | 160k: 17.7-18.3 → 16.3-17.3 µs/req, p95 1.3 → 3.6-4.8 ms; **448k: PASS → FAIL** (reads p99 191 → 963 ms, 14.8 → 16.9 µs/req), 480k: PASS → FAIL | no (knob): ring 0's wait holds back the other 7 rings |
 | `KN_DEFER=1` (`DEFER_TASKRUN`) on top of pacing | 16.3-17.3 → 18.0-18.2 µs/req at 160k | no (knob) |
+| **C PGO (gcc), trained during the build** | read micro-benchmark, 5 alternating runs: feed plan 5.83-5.87 → 4.95-5.16 µs/call (−15 %), post 2.59-2.87 → 2.50-2.61; load runs within noise (see below) | **yes** |
+| C PGO with clang 18 instead of gcc (`CC=clang`) | feed 4.89-5.03, post 2.51-2.69 µs/call: the same as gcc PGO; clang without PGO is no faster than gcc (feed 6.17-6.59) | knob |
+| Oracle GraalVM 25.0.4 instead of CE 25.5.5 (`KG_GRAAL=oracle`) | 160k: 18.6-19.8 → 31.9-35.0 µs/req (user 7.0 → 21-23); its builder rejects the build-time FFM handles (`linkToNative`), so `app.H` must be initialized at run time, and CE with run-time init costs the same (34.0, 37.3) | no (knob) |
+| Oracle native-image PGO (`KG_PGO=1`) on top | 160k: 31.9-35.0 → 30.5-33.4 µs/req (noise); 448k: 2 of 3 FAIL at 89-100 % CPU; the instrumented build needs > 2 GB | no (knob; does not fit the box) |
 
-Build on one core (`taskset -c 12`, a 1.5 GB scope): 4 min 16 s in all (native-image 3 min 18 s), cgroup peak
-1,129 MB with page cache, native-image builder RSS 1.04 GB.
+Build on one core (`taskset -c 12`, a 1.5 GB scope), default (C PGO): 4 min 37 s in all (native-image 3 min 2 s,
+training 12.6 s), cgroup peak 1,049 MB, builder RSS 1.07 GB. Without C PGO: 3 min 41 s.
 
 ## Knobs (all optional; the defaults are what is scored)
 
 `KG_MODE=jit` (Graal JIT instead of the native image), `KG_HEAP` (default `96m`), `KG_JAVA_OPTS` (extra JVM flags in
 JIT mode). Build: `KG_NATIVE=0` (no native image), `KG_NI_XMX` (builder heap, default `800m`), `KG_MARCH`,
-`KG_NI_O`, `KG_CFLAGS`, `KG_NI_EXTRA`. The C side's knobs, as in the Kotlin/Native entry: `KN_VFS`, `KN_BTREE=0`,
+`KG_NI_O`, `KG_CFLAGS`, `KG_NI_EXTRA`. PGO: `KG_CPGO=0` (no C PGO), `CC=clang` (needs apt `clang llvm`;
+`KG_PROFDATA` = its llvm-profdata), `KG_TRAIN_PORT` / `KG_TRAIN_REQS` / `KG_TRAIN_CONNS` / `KG_TRAIN_TIMEOUT` /
+`KG_TRAIN_USERS` / `KG_TRAIN_POSTS` / `KG_TRAIN_LIKES`; `KG_GRAAL=oracle` (Oracle GraalVM 25.0.4 in
+`/opt/oracle-graalvm-jdk-25.0.4`, installed by `KG_GRAAL=oracle install.sh`), `KG_PGO=1` (its native-image PGO),
+`KG_NI_XMX_INST` (builder heap of the instrumented image, default `2g`), `KG_NI_BUILDINIT=0/1` (FFM handles
+initialized at build time; default 1 with CE, 0 with Oracle). The C side's knobs, as in the Kotlin/Native entry: `KN_VFS`, `KN_BTREE=0`,
 `KN_SNAPSHOT=0`, `KN_WINDOW_US` / `KN_BATCH_MAX`, `KN_PACE_NR` / `KN_PACE_US`, `KN_DEFER=1`, `KN_RINGS`,
 `KN_STATS=1`, `KN_VERIFY=1`.
 
@@ -123,6 +152,8 @@ Both pass in both modes and with pacing on.
   `critical(true)`, the per-state / monomorphic call-site discipline, GraalVM native-image for a Kotlin server.
 - java-iouring-davidhsv: FFM over an io_uring + B-tree C side from a JVM language, critical downcalls only for what
   never waits, the AVX-512 caution for Cascade Lake.
+- c-iouring-pavlyhalim: PGO trained inside `build.sh` on a synthetic database the build generates, with a training
+  client sending the load test's mix plus the error paths, and a plain-build fallback if training fails.
 - Everything the Kotlin/Native entry credits for the C side: rust-iouring-kensac, c-iouring-pavlyhalim,
   rust-iouring-rkkautsar, swift-iouring-akbashev, zig-iouring-unorig-username.
 
@@ -130,3 +161,5 @@ Both pass in both modes and with pacing on.
 
 SQLite: public domain. liburing: MIT (dual MIT / LGPL-2.1; used under MIT). GraalVM Community: GPLv2 with the
 Classpath Exception (the native image links its runtime under that exception). Kotlin compiler and stdlib: Apache-2.0.
+Oracle GraalVM (only with the `KG_GRAAL=oracle` knob, not installed by default): GraalVM Free Terms and Conditions
+(GFTC); whether that fits this use is an open question for the owner, see the b4-graal-pgo report.
