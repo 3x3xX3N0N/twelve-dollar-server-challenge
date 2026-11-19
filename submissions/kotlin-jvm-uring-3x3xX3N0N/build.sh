@@ -42,7 +42,9 @@ fi
 SQLITE_OPTS="-DSQLITE_THREADSAFE=2 -DSQLITE_ENABLE_QPSG -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0
   -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_USE_ALLOCA
   -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 -DSQLITE_LIKE_DOESNT_MATCH_BLOBS"
-CFLAGS="${KJ_CFLAGS:--O2} -fPIC -g0 -Wall -Wno-unused-function"
+# -O3 -march=native: built on the box for the box's CPU (measured -2 to -3 % us/req LOCAL against -O2); 256-bit vectors
+# at most, because 512-bit instructions lower a Cascade Lake core's clock.
+CFLAGS="${KJ_CFLAGS:--O3 -march=native -mprefer-vector-width=256} -fPIC -g0 -Wall -Wno-unused-function"
 $CC $CFLAGS $SQLITE_OPTS -w -I"$D/sqlite" -I"$ROOT/csrc" -c "$ROOT/csrc/db.c" -o "$C/db.o"
 $CC $CFLAGS -I"$D/liburing/src/include" -I"$ROOT/csrc" -c "$ROOT/csrc/uring.c" -o "$C/uring.o"
 $CC $CFLAGS -I"$ROOT/csrc" -c "$ROOT/csrc/jvm.c" -o "$C/jvm.o"

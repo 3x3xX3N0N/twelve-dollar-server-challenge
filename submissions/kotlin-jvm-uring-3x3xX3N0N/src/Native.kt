@@ -50,11 +50,12 @@ private val POST = fn("kj_post", true, I, J, A, I, I)
 private val HEALTH = fn("db_health", true, I, A, I)
 private val ADD_LIKE = fn("kj_add_like", true, I, J, J)
 private val ADD_POST = fn("kj_add_post", true, I, J, A, I, I, I, I)
-private val WQ_START = fn("db_wq_start", true, I)
+// may run the COMMIT (on-loop group commit): an ordinary downcall
+private val WQ_START = fn("db_wq_start", false, I)
 private val WQ_DONE = fn("db_wq_done", true, I)
 private val WQ_RESULT = fn("db_wq_result", true, I, I, A, A, I)
 private val RELEASE = fn("kj_release", true, I)
-private val PASS_END = fn("kj_pass_end", true, I)
+private val PASS_END = fn("kj_pass_end", false, I)   // may retry a staged COMMIT
 private val UR_STAT = fn("ur_stat", false, J, I)
 private val DB_STAT = fn("db_stat", false, J, I)
 

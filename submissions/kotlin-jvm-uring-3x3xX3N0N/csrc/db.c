@@ -33,7 +33,14 @@ static int rd_open;                 /* reader holds a read transaction (snapshot
 static int use_btree;
 static atomic_int ckpt_want;        /* checkpointer waits for readers to leave their snapshot */
 static int64_t n_bt, n_sql, n_snap;
-static int keep_snapshot = 1;      /* KN_SNAPSHOT=0: a new read transaction every loop pass (for measuring) */
+static int keep_snapshot = 1;      /* KJ_SNAPSHOT=0: a new read transaction every loop pass (for measuring) */
+/* KJ_COMMITTER=1: group commit on a committer thread with its own connection (the Kotlin/Native entry's design).
+ * Default (0): the loop commits on the reader connection itself. A COMMIT by another connection makes the reader drop
+ * its whole page cache at its next read transaction (SQLite's WAL "changed" check), which turned into one pread per
+ * page read; committing on the same connection keeps the cache (measured in the README). */
+static int committer;
+static int ol_pending;              /* on-loop: a batch is staged but BEGIN IMMEDIATE was busy (checkpoint hold) */
+static void ol_try(void);
 
 static int64_t now_ns(void);
 
@@ -108,6 +115,7 @@ static void rd_end(void) {
 }
 
 void db_pass_end(void) {
+    if (ol_pending) ol_try();
     if (rd_open && (!keep_snapshot || atomic_load_explicit(&ckpt_want, memory_order_relaxed))) rd_end();
 }
 
@@ -119,13 +127,24 @@ void db_pass_end(void) {
 int db_open(const char *path, const char *vfs, int btree, char *err, int errcap) {
     snprintf(g_path, sizeof g_path, "%s", path);
     snprintf(g_vfs, sizeof g_vfs, "%s", vfs ? vfs : "");
-    keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
+    committer = getenv("KJ_COMMITTER") && getenv("KJ_COMMITTER")[0] == '1';
+    keep_snapshot = !(getenv("KJ_SNAPSHOT") && getenv("KJ_SNAPSHOT")[0] == '0');
     /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
      * ~400k connections the 2 GB box is short of memory, not CPU. */
-    if (open_conn(&rdb, 5000, err, errcap, "PRAGMA cache_size=-65536") ||
+    /* Reader page cache 256 MiB (KJ_CACHE_KB; the seed database is 248 MB): it is kept across transactions now that
+     * only this connection writes (see committer above), so most reads stop costing a pread. KJ_MMAP: mmap_size. */
+    char rcache[64];
+    snprintf(rcache, sizeof rcache, "PRAGMA cache_size=-%d", getenv("KJ_CACHE_KB") ? atoi(getenv("KJ_CACHE_KB")) : 262144);
+    if (open_conn(&rdb, 5000, err, errcap, rcache) ||
         /* The committer thread is off the loop, so its BEGIN can wait out a checkpoint hold that a slow disk
          * stretches (measured: 2 x 1 s was not enough at 416k users on a busy disk; 15 likes got a 500). */
-        open_conn(&wdb, 10000, err, errcap, "PRAGMA cache_size=-16384")) return -1;
+        (committer && open_conn(&wdb, 10000, err, errcap, "PRAGMA cache_size=-16384"))) return -1;
+    if (!committer) wdb = rdb;
+    if (getenv("KJ_MMAP")) {
+        char m[64];
+        snprintf(m, sizeof m, "PRAGMA mmap_size=%lld", atoll(getenv("KJ_MMAP")));
+        if (exec(rdb, m, err, errcap)) return -1;
+    }
     if (prep(rdb, "BEGIN", &st_rbegin, err, errcap) ||
         prep(rdb, "COMMIT", &st_rcommit, err, errcap) ||
         prep(rdb, "SELECT 1", &st_health, err, errcap) ||
@@ -274,6 +293,12 @@ int db_wq_start(void) {
     inflight = staging;
     staging = staging == &wb[0] ? &wb[1] : &wb[0];
     staging->n = 0; staging->alen = 0;
+    if (!committer) {   /* on the loop: now, or at a later pass end if a checkpoint holds the write lock */
+        pthread_mutex_unlock(&wq_mu);
+        ol_pending = 1;
+        ol_try();
+        return 0;
+    }
     wq_state = 1;
     pthread_cond_signal(&wq_cv);
     pthread_mutex_unlock(&wq_mu);
@@ -309,9 +334,37 @@ void db_wq_release(void) {
 }
 
 /* One batch: BEGIN IMMEDIATE (waits out a checkpoint hold here, off the loop), the statements, COMMIT. */
+static void run_body(wbatch *b, int rc);
+
 static void run_batch(wbatch *b) {
     int rc = SQLITE_BUSY;
     for (int tries = 0; tries < 2 && (rc & 0xff) == SQLITE_BUSY; tries++) rc = step_reset(st_wbegin);
+    run_body(b, rc);
+}
+
+static void wq_signal(void) {
+    uint64_t one = 1;
+    if (write(wq_efd, &one, sizeof one) < 0) perror("committer eventfd");
+}
+
+/* On-loop group commit: BEGIN IMMEDIATE without waiting (a checkpoint RESTART can hold the write lock for a few ms;
+ * then the batch stays staged and the next pass end tries again, while reads go on), the statements, COMMIT; the
+ * eventfd tells the loop the results are ready, as the committer thread does. */
+static void ol_try(void) {
+    rd_end();   /* BEGIN IMMEDIATE needs the connection out of its read transaction */
+    sqlite3_busy_timeout(rdb, 0);
+    int rc = step_reset(st_wbegin);
+    sqlite3_busy_timeout(rdb, 5000);
+    if ((rc & 0xff) == SQLITE_BUSY) return;
+    ol_pending = 0;
+    run_body(inflight, rc);
+    pthread_mutex_lock(&wq_mu);
+    wq_state = 2;
+    pthread_mutex_unlock(&wq_mu);
+    wq_signal();
+}
+
+static void run_body(wbatch *b, int rc) {
     int ok = rc == SQLITE_OK;
     if (!ok) fprintf(stderr, "group commit: BEGIN: %s\n", sqlite3_errmsg(wdb));
     for (int i = 0; ok && i < b->n; i++) {
@@ -362,8 +415,7 @@ static void *wq_main(void *arg) {
         pthread_mutex_lock(&wq_mu);
         wq_state = 2;
         pthread_mutex_unlock(&wq_mu);
-        uint64_t one = 1;
-        if (write(wq_efd, &one, sizeof one) < 0) perror("committer eventfd");
+        wq_signal();
     }
     return 0;
 }
@@ -371,6 +423,7 @@ static void *wq_main(void *arg) {
 int db_wq_init(void) {
     wq_efd = eventfd(0, EFD_CLOEXEC);
     if (wq_efd < 0) return -1;
+    if (!committer) return wq_efd;   /* commits run on the loop: no thread */
     pthread_t t;
     pthread_attr_t a;
     pthread_attr_init(&a);
@@ -453,7 +506,7 @@ static void *ckpt_main(void *arg) {
     sqlite3 *c = 0;
     char err[256];
     if (open_conn(&c, CK_HOLD_MS, err, sizeof err, "PRAGMA cache_size=-2048")) { fprintf(stderr, "checkpointer: %s\n", err); return 0; }
-    int logst = getenv("KN_CKPT_LOG") && getenv("KN_CKPT_LOG")[0] == '1';
+    int logst = getenv("KJ_CKPT_LOG") && getenv("KJ_CKPT_LOG")[0] == '1';
     int64_t last = now_ns(), maxhold = 0, sumhold = 0;
     int restarts = 0, fails = 0, maxlog = 0;
     for (;;) {

@@ -50,11 +50,12 @@ private val LIKED_NEW = a("{\"liked\":true,\"already_liked\":false,\"post_id\":"
 private val LIKED_OLD = a("{\"liked\":true,\"already_liked\":true,\"post_id\":")
 
 // Group-commit window and loop pacing (as the Kotlin/Native entry; see its README for the measurements).
-private val WRITE_WINDOW_NS = envLong("KJ_WINDOW_US", 2000) * 1000
-private val BATCH_MAX = envLong("KJ_BATCH_MAX", 64).toInt()
+private val WRITE_WINDOW_NS = envLong("KJ_WINDOW_US", 10000) * 1000
+private val BATCH_MAX = envLong("KJ_BATCH_MAX", 1024).toInt()
 private val PACE_NR = envLong("KJ_PACE_NR", 1).toInt()
 private val PACE_US = envLong("KJ_PACE_US", 1000)
 private val STATS = envLong("KJ_STATS", 0) != 0L
+private val STALLS = envLong("KJ_STALLS", 0) != 0L   // log passes whose own work took > 50 ms
 
 fun envLong(name: String, def: Long): Long = System.getenv(name)?.toLongOrNull() ?: def
 
@@ -109,7 +110,9 @@ class Server(private val jwt: Jwt) {
                 val w = if (left <= 0 || writes.size >= BATCH_MAX) 0 else (left + 999) / 1000
                 timeoutUs = if (timeoutUs < 0) w else minOf(timeoutUs, w)
             }
+            val t0 = if (STALLS) System.nanoTime() else 0L
             kjEnter(waitNr, timeoutUs)
+            val t1 = if (STALLS) System.nanoTime() else 0L
             val n = kjReap(evSeg, MAX_EV, inSeg, inb.size)
             val e = ev
             for (i in 0 until n) {
@@ -124,7 +127,14 @@ class Server(private val jwt: Jwt) {
             }
             if (writes.isNotEmpty() && inFlight.isEmpty() &&
                 (writes.size >= BATCH_MAX || System.nanoTime() - firstWriteNs >= WRITE_WINDOW_NS)) startBatch()
+            val nw = writes.size
+            val t2 = if (STALLS) System.nanoTime() else 0L
             kjPassEnd()
+            if (STALLS) {
+                val t3 = System.nanoTime()
+                if (t3 - t1 > 50_000_000L) println("stall: enter ${(t1 - t0) / 1000} us (timeout $timeoutUs), " +
+                    "handlers+batch ${(t2 - t1) / 1000} us ($n events, $nw writes queued, ${inFlight.size} in flight), pass end ${(t3 - t2) / 1000} us")
+            }
             light = n in 1 until PACE_NR
             if (STATS && System.nanoTime() - lastStats > 10_000_000_000L) {
                 lastStats = System.nanoTime()
