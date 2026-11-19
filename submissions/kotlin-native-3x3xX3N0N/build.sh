@@ -11,8 +11,9 @@ ROOT="$PWD"
 KN="${KN_HOME:-/opt/kotlin-native-2.4.21}"
 [ -x "$KN/bin/kotlinc-native" ] || KN="$(dirname "$(dirname "$(command -v kotlinc-native)")")"
 if [ -x /opt/jdk-25/bin/java ]; then export JAVA_HOME=/opt/jdk-25; fi
-# Two malloc arenas and a capped heap keep the compiler inside a 2 GB box.
-export MALLOC_ARENA_MAX=2 JAVA_OPTS="${JAVA_OPTS:--Xmx1200m -XX:+UseSerialGC}"
+# Two malloc arenas and a capped heap keep the compiler well inside the box (measured: a cold build, toolchain download
+# included, peaks at ~560 MB anonymous memory in a 1.5 GB no-swap cgroup; the rest of the cgroup peak is page cache).
+export MALLOC_ARENA_MAX=2 JAVA_OPTS="${JAVA_OPTS:--Xmx800m -XX:+UseSerialGC}"
 
 SQLITE_URL=https://sqlite.org/2026/sqlite-amalgamation-3540100.zip
 SQLITE_SHA3=92281c86e2957f9b9305890f9ac04204caa7b677cc868dc326d942689df28e30
