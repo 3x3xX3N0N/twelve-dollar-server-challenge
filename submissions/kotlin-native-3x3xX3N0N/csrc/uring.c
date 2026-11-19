@@ -73,7 +73,10 @@ static ringx R[MAX_RINGS];
 static int nrings, maxrings, efd = -1, table_size;
 /* KN_LISTENERS=n (1..8): n SO_REUSEPORT listeners on the port, accepts spread over them (default 1). */
 static int lfds[MAX_LISTENERS], nlisten = 1, lacc[MAX_LISTENERS];
-static int defer_taskrun;   /* IORING_SETUP_DEFER_TASKRUN (completions run only when we enter); KN_DEFER=0 turns it off */
+/* KN_DEFER=1: IORING_SETUP_DEFER_TASKRUN on every ring (completions posted only when the loop enters a ring). Off by
+ * default: with the batch wait (wait for 256 completions) it measured worse at 256k users (reads p95 0.5 -> 40 ms,
+ * 14.5 -> 16.5 us/req; either one alone was fine), so the rings use COOP_TASKRUN and the eventfd. */
+static int defer_taskrun;
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
@@ -127,7 +130,7 @@ static int ring_create(int r) {
      * sleeps longer than DEFER_IDLE_US and enters every ring each pass (without that cap an idle server left
      * connections accepted by ring 1 unanswered: test-rings.sh). */
     p.flags = IORING_SETUP_SINGLE_ISSUER | IORING_SETUP_CQSIZE |
-              (defer_taskrun ? IORING_SETUP_DEFER_TASKRUN : IORING_SETUP_COOP_TASKRUN | IORING_SETUP_TASKRUN_FLAG);
+              (defer_taskrun ? IORING_SETUP_DEFER_TASKRUN : IORING_SETUP_COOP_TASKRUN) | IORING_SETUP_TASKRUN_FLAG;
     p.cq_entries = CQ_ENTRIES;
     int rc = io_uring_queue_init_params(SQ_ENTRIES, &R[r].ring, &p);
     if (rc < 0) {   /* older kernel: plain ring */
@@ -204,7 +207,7 @@ int ur_init(const char *host, int port, int max_rings) {
     if (getenv("KN_TABLE")) table_size = atoi(getenv("KN_TABLE"));   /* testing the ring spill with small tables */
     if (table_size < 2 * FD_MARGIN) table_size = 2 * FD_MARGIN;
     maxrings = max_rings < 1 ? 1 : max_rings > MAX_RINGS ? MAX_RINGS : max_rings;
-    defer_taskrun = !(getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '0');
+    defer_taskrun = getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '1';
 
     if (getenv("KN_LISTENERS")) nlisten = atoi(getenv("KN_LISTENERS"));
     if (nlisten < 1) nlisten = 1;
@@ -452,6 +455,17 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
 
 static int backlog;   /* the last pass left completions in a queue (event array full) */
 
+/* Posts a DEFER_TASKRUN ring's pending completions. One GETEVENTS enter runs only a bounded number of them on newer
+ * kernels (about 20 without a wait), so repeat while the kernel still flags task work (IORING_SETUP_TASKRUN_FLAG).
+ * Without this, secondary rings fell behind at 256k users (p99 510 ms at 37 % CPU). */
+static void drain_deferred(int r) {
+    for (int k = 0; k < 256; k++) {
+        if (r > 0 || k > 0) io_uring_get_events(&R[r].ring);
+        if (!(IO_URING_READ_ONCE(*R[r].ring.sq.kflags) & IORING_SQ_TASKRUN)) break;
+        if (io_uring_cq_ready(&R[r].ring) > CQ_ENTRIES / 2) break;   /* plenty to do already */
+    }
+}
+
 int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
     g_evs = evs; g_nev = 0; g_max = max;
     if (!accept_failed) top_up_accepts();
@@ -477,7 +491,7 @@ int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
     R[0].dirty = 0;
     /* 3. Collect what the secondary rings completed meanwhile (with DEFER_TASKRUN they post only when entered). */
     if (defer_taskrun)
-        for (int r = 1; r < nrings; r++) io_uring_get_events(&R[r].ring);
+        for (int r = 0; r < nrings; r++) drain_deferred(r);
     /* A CQE can add up to two events (a close emits one); keep room. */
     backlog = 0;
     for (int r = 0; r < nrings; r++) {

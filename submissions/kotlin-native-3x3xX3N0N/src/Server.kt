@@ -62,10 +62,10 @@ class Server(private val jwt: Jwt) {
         private val WRITE_WINDOW_NS = envLong("KN_WINDOW_US", 20000) * 1000
         private val BATCH_MAX = envLong("KN_BATCH_MAX", 1024).toInt()
         // Batch wake (idea: kotlin-trikeshed-jnorthrup, rust-iouring-kensac): after a pass with fewer than PACE_NR
-        // completions the next io_uring_enter on ring 0 waits for PACE_NR completions or PACE_US (or the group-commit
-        // deadline); all rings use DEFER_TASKRUN and the secondary rings are collected after that wait (csrc/uring.c).
-        // Measured 160k users (LOCAL, netns): loop passes 8.4k -> 0.7k per second, 15.8 -> 14.7 and 18.4 -> 16.3
-        // us/req, p95 7.5 -> 11-14 ms. KN_PACE_NR=1 KN_DEFER=0 = the old loop.
+        // completions the next io_uring_enter waits on ring 0 alone for PACE_NR completions or PACE_US (or the
+        // group-commit deadline); the secondary rings are collected after that wait (csrc/uring.c). Measured 160k users
+        // (LOCAL, netns, two pairs): loop passes 8.2k -> 1.9k per second, 15.7 -> 14.7 and 16.7 -> 14.8 us/req, reads
+        // p95 0.3 -> 2.2 ms. KN_PACE_NR=1 = the old loop (return at the first completion).
         private val PACE_NR = envLong("KN_PACE_NR", 256).toInt()   // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
         private val STATS = envLong("KN_STATS", 0) != 0L
