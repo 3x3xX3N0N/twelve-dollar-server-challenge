@@ -1,4 +1,4 @@
-/* The C side of the Kotlin/Native server, as seen by Kotlin through cinterop (kn.def).
+/* The C side of the server (shared with the Kotlin/Native entry; the JVM reaches it through FFM via jvm.c).
  * Kotlin owns the event loop, HTTP, routing, JWT and JSON; C owns the kernel plumbing (io_uring through liburing)
  * and SQLite (the stock amalgamation compiled into db.c, plus B-tree read paths in btree_reads.c). */
 #ifndef KN_H

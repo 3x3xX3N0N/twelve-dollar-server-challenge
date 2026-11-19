@@ -4,14 +4,16 @@
  * here writes SQLite's internal state.
  *
  * Connections (all in this one process):
- *   reader  - GET /feed, GET /posts/:id, /health. Its read transaction (snapshot) is kept across loop passes and
- *             dropped only after our own writer commits (so every request still sees every committed write) or
- *             when the checkpointer waits for readers. Idea credit: rust-iouring-rkkautsar (snapshot reuse).
- *   writer  - the group-commit transaction, on its own committer thread: BEGIN IMMEDIATE (busy timeout 10 s, so it
- *             waits out a checkpoint hold), INSERTs, COMMIT; the loop answers only after COMMIT has returned.
+ *   reader  - GET /feed, GET /posts/:id, /health, and (default) the group commit too, on the loop: BEGIN IMMEDIATE
+ *             without waiting (if a checkpoint holds the write lock, the batch waits for a later pass while reads go
+ *             on), INSERTs, COMMIT; the loop answers only after COMMIT has returned. Its read transaction (snapshot)
+ *             is kept across loop passes and ended before each commit (so every request still sees every committed
+ *             write) or when the checkpointer waits for readers. Idea credit: rust-iouring-rkkautsar (snapshot reuse).
+ *   writer  - only with KJ_COMMITTER=1 (the Kotlin/Native entry's design): the group commit on its own committer
+ *             thread and connection (busy timeout 10 s, so it waits out a checkpoint hold).
  *   checkpointer thread - PASSIVE every 50 ms; RESTART with a bounded 250 ms hold once the WAL is long and nearly
  *             copied; nice 5. Idea credit: swift-iouring-akbashev, rust-iouring-kensac (MIT).
- * WAL + synchronous=NORMAL (rule 6), mmap off, 64 MiB page cache. */
+ * WAL + synchronous=NORMAL (rule 6), mmap off, 256 MiB reader page cache. */
 #include "sqlite3.c"
 #include "kn.h"
 #include <pthread.h>
@@ -129,8 +131,7 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     snprintf(g_vfs, sizeof g_vfs, "%s", vfs ? vfs : "");
     committer = getenv("KJ_COMMITTER") && getenv("KJ_COMMITTER")[0] == '1';
     keep_snapshot = !(getenv("KJ_SNAPSHOT") && getenv("KJ_SNAPSHOT")[0] == '0');
-    /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
-     * ~400k connections the 2 GB box is short of memory, not CPU. */
+    /* The writer (KJ_COMMITTER=1 only) and the checkpointer touch far fewer pages (16 MiB / 2 MiB). */
     /* Reader page cache 256 MiB (KJ_CACHE_KB; the seed database is 248 MB): it is kept across transactions now that
      * only this connection writes (see committer above), so most reads stop costing a pread. KJ_MMAP: mmap_size. */
     char rcache[64];
@@ -222,7 +223,7 @@ int db_post(int64_t id, uint8_t *out, int cap) {
     return post_sql(id, out, cap);
 }
 
-/* ------------------------------------------------------------------ writes (committer thread) */
+/* ------------------------------------------------------------------ writes (group commit: on the loop or a committer thread) */
 typedef struct wop {
     int kind;                 /* 0 like, 1 post */
     int64_t uid, pid;
