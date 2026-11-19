@@ -442,7 +442,11 @@ int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
  * this through a non-critical downcall, so the JVM can reach a safepoint while the loop thread sleeps; the reaping
  * ur_poll(timeout 0) that follows is a critical call. Returns 1 if completions were already waiting. */
 int ur_wait(int wait_nr, int64_t timeout_us) {
-    if (any_ready()) return 1;
+    if (wait_nr <= 1 && any_ready()) return 1;   /* pacing (wait_nr > 1) waits for wait_nr on ring 0 or the timeout */
+    for (int r = 1; r < nrings; r++) {   /* the other rings' queued sends must not wait for ring 0's sleep */
+        if (R[r].dirty || io_uring_sq_ready(&R[r].ring)) io_uring_submit(&R[r].ring);
+        R[r].dirty = 0;
+    }
     struct io_uring_cqe *cqe;
     if (timeout_us < 0) io_uring_submit_and_wait(&R[0].ring, 1);
     else {

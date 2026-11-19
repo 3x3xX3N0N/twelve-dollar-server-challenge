@@ -4,7 +4,7 @@
 #   2. build/libkn.so: csrc/*.c (our io_uring + SQLite B-tree shim; db.c #includes sqlite3.c unchanged) + liburing;
 #   3. build/app.jar: src/*.kt with kotlinc 2.4.21 on the GraalVM JDK;
 #   4. build/server: a GraalVM native-image of the same jar (KG_NATIVE=0 skips it; start.sh then runs the JIT mode).
-# Peak memory: native-image is the big step; its heap is capped at KG_NI_XMX (default 1100m), see README.
+# Peak memory: native-image is the big step; its heap is capped at KG_NI_XMX (default 800m): ~1.1 GB peak on one core, see README.
 set -euo pipefail
 cd "$(dirname "$0")"
 ROOT="$PWD"
@@ -43,7 +43,10 @@ fi
 SQLITE_OPTS="-DSQLITE_THREADSAFE=2 -DSQLITE_ENABLE_QPSG -DSQLITE_DEFAULT_MEMSTATUS=0 -DSQLITE_DQS=0
   -DSQLITE_OMIT_LOAD_EXTENSION -DSQLITE_OMIT_DEPRECATED -DSQLITE_OMIT_SHARED_CACHE -DSQLITE_USE_ALLOCA
   -DSQLITE_DEFAULT_WAL_SYNCHRONOUS=1 -DSQLITE_LIKE_DOESNT_MATCH_BLOBS"
-CFLAGS="-O2 -fPIC -g0 -Wall -Wno-unused-function"
+# -O3 -march=native: build.sh runs on the box, so this targets the box's own CPU, with vectors kept at 256 bits
+# (no AVX-512 clock drop on Cascade Lake). KG_CFLAGS overrides. Measured (read micro-benchmark, 5 alternating pairs,
+# LOCAL): the feed plan 6.25-6.45 -> 5.76-6.15 us per call against -O2, the post plan unchanged.
+CFLAGS="${KG_CFLAGS:--O3 -march=native -mprefer-vector-width=256} -fPIC -g0 -Wall -Wno-unused-function"
 $CC $CFLAGS $SQLITE_OPTS -w -I"$D/sqlite" -I"$ROOT/csrc" -c "$ROOT/csrc/db.c" -o "$C/db.o"
 $CC $CFLAGS -I"$D/liburing/src/include" -I"$ROOT/csrc" -c "$ROOT/csrc/uring.c" -o "$C/uring.o"
 $CC $CFLAGS -I"$ROOT/csrc" -c "$ROOT/csrc/jv.c" -o "$C/jv.o"
@@ -56,12 +59,12 @@ cp "$KC/lib/kotlin-stdlib.jar" "$B/kotlin-stdlib.jar"
 
 # ---- 4. native-image (closed world: the FFM handles in app.H are created here, at image build time)
 if [ "${KG_NATIVE:-1}" != "0" ]; then
-  MARCH=()
-  # -march=native targets the CPU this build runs on (the box itself); KG_MARCH overrides (e.g. x86-64-v3, compatibility).
-  MARCH=("-march=${KG_MARCH:-native}")
+  # x86-64-v3 (AVX2, BMI, FMA): the box's Cascade Lake has it. Not -march=native: on Cascade Lake that would allow
+  # AVX-512, and 512-bit code lowers the core's clock for what follows. KG_MARCH overrides (native, compatibility).
+  MARCH=("-march=${KG_MARCH:-x86-64-v3}")
   rm -f "$B/server"
-  native-image -J-Xmx"${KG_NI_XMX:-1100m}" -J-XX:+UseSerialGC --no-fallback --gc=serial "${MARCH[@]}" -O"${KG_NI_O:-2}" \
-    --enable-native-access=ALL-UNNAMED --initialize-at-build-time=app.H \
+  native-image -J-Xmx"${KG_NI_XMX:-800m}" -J-Djava.io.tmpdir="${TMPDIR:-/tmp}" --gc=serial "${MARCH[@]}" -O"${KG_NI_O:-2}" \
+    --enable-native-access=ALL-UNNAMED --initialize-at-build-time=app.H ${KG_NI_EXTRA:-} \
     -H:+UnlockExperimentalVMOptions -H:+ForeignAPISupport -H:-UnlockExperimentalVMOptions \
     -cp "$B/app.jar:$B/kotlin-stdlib.jar:$ROOT/native-image" -o "$B/server" app.MainKt
   ls -la "$B/server"

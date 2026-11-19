@@ -120,19 +120,24 @@ class Server(private val jwt: Jwt) {
         var light = false
         var lastStats = System.nanoTime()
         while (true) {
-            var waitNr = if (light) PACE_NR else 1
-            var timeoutUs = if (light) PACE_US else -1L
+            // Blocking wait when a pass finds nothing: until a completion, or until the group-commit window ends.
+            var timeoutUs = -1L
             if (qn > 0 && fn < 0) {
                 val left = WRITE_WINDOW_NS - (System.nanoTime() - firstWriteNs)
-                val w = if (left <= 0 || qn >= BATCH_MAX) 0 else (left + 999) / 1000
-                timeoutUs = if (timeoutUs < 0) w else minOf(timeoutUs, w)
+                timeoutUs = if (left <= 0 || qn >= BATCH_MAX) 0 else (left + 999) / 1000
             }
-            // Sends the previous pass's output, ends the pass on the DB side, waits, and copies the new events in.
+            if (light) {
+                // Pacing (KN_PACE_NR > 1): after a pass with fewer than PACE_NR events, hand this pass's output to
+                // the kernel and wait for PACE_NR completions or PACE_US, so the next pass serves more sockets.
+                if (ntab > 0) { N.send(tabSeg, ntab, oSeg); ntab = 0; olen = 0; segStart = 0 }
+                N.waitEvents(PACE_NR, if (timeoutUs < 0) PACE_US else minOf(PACE_US, timeoutUs))
+            }
+            // Sends the previous pass's output, ends the pass on the DB side, and copies the new events in (never sleeps).
             var n = N.step(tabSeg, ntab, oSeg, evSeg, inSeg, inp.size, MAX_EV, 1, 0L)
             ntab = 0; olen = 0; segStart = 0
             if (n == 0 && timeoutUs != 0L) {
                 // nothing ready: sleep in a plain (non-critical) downcall, then reap
-                N.waitEvents(waitNr, timeoutUs)
+                N.waitEvents(1, timeoutUs)
                 n = N.step(tabSeg, 0, oSeg, evSeg, inSeg, inp.size, MAX_EV, 1, 0L)
             }
             var at = 0
