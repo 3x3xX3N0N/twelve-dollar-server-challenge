@@ -77,6 +77,11 @@ static int lfds[MAX_LISTENERS], nlisten = 1, lacc[MAX_LISTENERS];
  * default: with the batch wait (wait for 256 completions) it measured worse at 256k users (reads p95 0.5 -> 40 ms,
  * 14.5 -> 16.5 us/req; either one alone was fine), so the rings use COOP_TASKRUN and the eventfd. */
 static int defer_taskrun;
+/* KN_PASS=sweep: the pass structure of java-iouring-davidhsv (#393; ideas only): every ring DEFER_TASKRUN; each pass
+ * first sweeps the secondary rings without waiting (submit, run their deferred completions), then waits on ring 0
+ * alone, then collects every ring. Default (batch): b3's batch wake on COOP_TASKRUN rings (see ur_poll). */
+static int pass_sweep;
+static int64_t st_sweep_enters;
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
@@ -194,8 +199,18 @@ static void mlock_self(void) {
     fprintf(stderr, "mlock: %zu KB of the binary locked%s\n", locked / 1024, fails ? " (some mappings failed)" : "");
 }
 
+/* PGO-instrumented builds only (build.sh's training run): write the profile when the training run stops us with
+ * SIGTERM. The symbol is weak, so in the real (non-instrumented) build it is NULL and SIGTERM keeps its default. */
+extern int __llvm_profile_write_file(void) __attribute__((weak));
+static void on_term(int sig) {
+    (void)sig;
+    __llvm_profile_write_file();
+    _exit(0);
+}
+
 int ur_init(const char *host, int port, int max_rings) {
     signal(SIGPIPE, SIG_IGN);
+    if (__llvm_profile_write_file) signal(SIGTERM, on_term);
     mlock_self();
     struct rlimit rl;
     if (getrlimit(RLIMIT_NOFILE, &rl) == 0 && rl.rlim_cur < rl.rlim_max) {
@@ -208,6 +223,8 @@ int ur_init(const char *host, int port, int max_rings) {
     if (table_size < 2 * FD_MARGIN) table_size = 2 * FD_MARGIN;
     maxrings = max_rings < 1 ? 1 : max_rings > MAX_RINGS ? MAX_RINGS : max_rings;
     defer_taskrun = getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '1';
+    pass_sweep = getenv("KN_PASS") && !strcmp(getenv("KN_PASS"), "sweep");
+    if (pass_sweep) defer_taskrun = 1;
 
     if (getenv("KN_LISTENERS")) nlisten = atoi(getenv("KN_LISTENERS"));
     if (nlisten < 1) nlisten = 1;
@@ -466,10 +483,47 @@ static void drain_deferred(int r) {
     }
 }
 
+/* KN_PASS=sweep: a ring that is not waited on. Submits what is queued and runs its deferred completions without
+ * sleeping; a ring with nothing queued and no task work flagged costs no system call. An enter that asks for no
+ * completions runs only a small batch of task work on newer kernels, so if the flag is still up a second enter asks
+ * for many completions with a zero timeout (it runs them all and returns at once). */
+static void sweep(int r) {
+    struct io_uring *q = &R[r].ring;
+    unsigned busy = IORING_SQ_TASKRUN | IORING_SQ_CQ_OVERFLOW;
+    R[r].dirty = 0;
+    if (!io_uring_sq_ready(q) && !(IO_URING_READ_ONCE(*q->sq.kflags) & busy)) return;
+    io_uring_submit_and_get_events(q);
+    st_sweep_enters++;
+    if (IO_URING_READ_ONCE(*q->sq.kflags) & IORING_SQ_TASKRUN) {
+        struct __kernel_timespec ts = {0, 0};
+        struct io_uring_cqe *cqe;
+        io_uring_wait_cqes(q, &cqe, 4096, &ts, 0);
+        st_sweep_enters++;
+    }
+}
+
+static int collect(void);
+
+static int poll_sweep(int wait_nr, int64_t timeout_us) {
+    for (int r = nrings - 1; r > 0; r--) sweep(r);
+    /* An idle server with secondary rings must still wake to sweep them (deferred rings never signal): cap the sleep. */
+    if (nrings > 1 && (timeout_us < 0 || timeout_us > DEFER_IDLE_US)) timeout_us = DEFER_IDLE_US;
+    struct io_uring_cqe *cqe;
+    if (backlog) io_uring_submit_and_get_events(&R[0].ring);
+    else if (timeout_us < 0) io_uring_submit_and_wait(&R[0].ring, 1);
+    else {
+        struct __kernel_timespec ts = {timeout_us / 1000000, (timeout_us % 1000000) * 1000};
+        io_uring_submit_and_wait_timeout(&R[0].ring, &cqe, (unsigned)(wait_nr < 1 ? 1 : wait_nr), &ts, 0);
+    }
+    R[0].dirty = 0;
+    return collect();
+}
+
 int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
     g_evs = evs; g_nev = 0; g_max = max;
     if (!accept_failed) top_up_accepts();
     accept_failed = 0;
+    if (pass_sweep) return poll_sweep(wait_nr, timeout_us);
     /* 1. Hand the secondary rings their new requests (sends of the last pass) before sleeping. */
     for (int r = 1; r < nrings; r++) {
         if (R[r].dirty || io_uring_sq_ready(&R[r].ring)) io_uring_submit(&R[r].ring);
@@ -492,7 +546,12 @@ int ur_poll(kn_ev *evs, int max, int wait_nr, int64_t timeout_us) {
     /* 3. Collect what the secondary rings completed meanwhile (with DEFER_TASKRUN they post only when entered). */
     if (defer_taskrun)
         for (int r = 0; r < nrings; r++) drain_deferred(r);
-    /* A CQE can add up to two events (a close emits one); keep room. */
+    return collect();
+}
+
+/* Turns every ring's ready completions into events (a CQE can add up to two: a close emits one; keep room). */
+static int collect(void) {
+    struct io_uring_cqe *cqe;
     backlog = 0;
     for (int r = 0; r < nrings; r++) {
         unsigned head, n = 0;
@@ -548,6 +607,7 @@ int64_t ur_stat(int which) {
     case 2: return st_accept_err;
     case 3: return nrings;
     case 4: return st_rearms;
+    case 5: return st_sweep_enters;
     default: return 0;
     }
 }

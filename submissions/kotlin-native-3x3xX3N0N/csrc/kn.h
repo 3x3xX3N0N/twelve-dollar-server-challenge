@@ -16,21 +16,24 @@ int db_health(char *err, int errcap);
 int db_feed(uint8_t *out, int cap);
 /* {"post":{...}} into out; returns its length, 0 = no such post, -1 = error. */
 int db_post(int64_t id, uint8_t *out, int cap);
-/* Group commit on a committer thread (the writer connection is used only there), so a slow disk write never
- * stops the loop from serving reads. The loop stages a batch, starts it, and keeps going; when the batch is
- * committed the thread writes to the eventfd returned by db_wq_init (watched by ring 0: an EV_WAKE event), and only
- * then does the loop read the results and answer. */
+/* Group commit. By default it runs on the loop, on the reader connection (keeps the reader's page cache): the loop
+ * stages a batch and db_wq_start commits it at once (returns 2: results ready) or, if a checkpoint holds the write
+ * lock, at a later db_pass_end (returns 1 then). With KN_COMMITTER=1, or for a while after a slow commit on the loop
+ * (slow-disk guard, KN_SLOW_MS), the batch goes to the committer thread (own connection) instead: db_wq_start returns
+ * 0 and the thread writes to the eventfd returned by db_wq_init (watched by ring 0: an EV_WAKE event) when it is done.
+ * Either way the loop answers the writes only after COMMIT has returned. */
 int db_wq_init(void);   /* starts the committer thread; returns the eventfd it signals (watch it on ring 0), or -1 */
 int db_wq_add_like(int64_t uid, int64_t pid);
 int db_wq_add_post(int64_t uid, const uint8_t *body, int blen, const uint8_t *author, int alen);
-int db_wq_start(void);       /* hands the staged batch to the thread: 0 = started, 1 = a batch is still in flight */
+int db_wq_start(void);       /* 2 = committed on the loop (results ready), 0 = started/pending, 1 = a batch is still in flight */
 int db_wq_done(void);        /* >= 0: the in-flight batch is committed (or failed) and has this many results; -1 = not yet */
 /* Result i of the finished batch: post: 201 + JSON; like: 1 new / 0 repeat / -1 no such post; -2 error (and the
  * whole batch is -2 if its COMMIT failed). For posts the JSON is copied to out; returns its length. */
 int db_wq_result(int i, int *code, uint8_t *out, int cap);
 void db_wq_release(void);    /* results read: the reader drops its snapshot (the next read sees the commit) */
-/* End of a loop pass: drops the reader's snapshot if the checkpointer is waiting for readers to move on. */
-void db_pass_end(void);
+/* End of a loop pass: retries a pending on-loop commit (returns 1 if it is now committed: read the results), and
+ * drops the reader's snapshot if the checkpointer is waiting for readers to move on. */
+int db_pass_end(void);
 /* Compares the B-tree paths with the SQL paths, byte for byte, for every post id in [1, max id + 10] and the feed.
  * Returns the number of mismatches (details on stderr). */
 int db_verify(void);

@@ -68,6 +68,10 @@ class Server(private val jwt: Jwt) {
         // p95 0.3 -> 2.2 ms. KN_PACE_NR=1 = the old loop (return at the first completion).
         private val PACE_NR = envLong("KN_PACE_NR", 256).toInt()   // after a light pass: wait for this many completions
         private val PACE_US = envLong("KN_PACE_US", 1000)          // ... or this long
+        // KN_PASS=sweep (csrc/uring.c, after java-iouring-davidhsv): every pass that follows a non-empty one waits on
+        // ring 0 for PACE_NR completions or PACE_US, not only after a light pass (KN_PACE_ALWAYS overrides).
+        private val SWEEP = platform.posix.getenv("KN_PASS")?.toKString() == "sweep"
+        private val PACE_ALWAYS = envLong("KN_PACE_ALWAYS", if (SWEEP) 1 else 0) != 0L
         private val STATS = envLong("KN_STATS", 0) != 0L
         private val HDR_STRUCT = envLong("KN_HDR", 1) != 0L   // one-pass head parser (request1); 0 = request0
         private val PROF = envLong("KN_PROF", 0) != 0L
@@ -106,12 +110,14 @@ class Server(private val jwt: Jwt) {
 
     fun run() {
         var light = false
+        var lastN = 0
         var lastStats = kn_now_ns()
         while (true) {
             // After a light pass the next wait gathers up to PACE_NR completions (or PACE_US, or until the group-commit
             // window ends), so one io_uring_enter serves more sockets; after a heavy pass it returns at the first one.
-            var waitNr = if (light) PACE_NR else 1
-            var timeoutUs = if (light) PACE_US else -1L
+            val pace = light || (PACE_ALWAYS && lastN > 0)
+            var waitNr = if (pace) PACE_NR else 1
+            var timeoutUs = if (pace) PACE_US else -1L
             when {
                 writes.isNotEmpty() && inFlight.isEmpty() -> {
                     val left = WRITE_WINDOW_NS - (kn_now_ns() - firstWriteNs)
@@ -135,7 +141,7 @@ class Server(private val jwt: Jwt) {
             val t2 = kn_now_ns()
             val nw = writes.size
             if (writes.isNotEmpty() && inFlight.isEmpty() && (writes.size >= BATCH_MAX || kn_now_ns() - firstWriteNs >= WRITE_WINDOW_NS)) startBatch()
-            db_pass_end()
+            if (db_pass_end() == 1) finishBatch()   // an on-loop commit that had to wait for the write lock is done
             if (STALLS) {
                 // A pass whose own work (not the wait for completions) took > 100 ms: print where the time went.
                 val t3 = kn_now_ns()
@@ -150,10 +156,12 @@ class Server(private val jwt: Jwt) {
             // A light pass (few completions, nothing queued) makes the next wait gather more completions per syscall;
             // under load every pass is heavy and this never waits. An idle server (n == 0) sleeps without a timeout.
             light = n in 1 until PACE_NR
+            lastN = n
             if (STATS && kn_now_ns() - lastStats > 10_000_000_000L) {
                 lastStats = kn_now_ns()
-                println("stats: open=${ur_stat(0)} rings=${ur_stat(3)} enobufs=${ur_stat(1)} rearms=${ur_stat(4)} " +
-                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)} walw=${db_stat(4)} walpw=${db_stat(5)}" +
+                println("stats: open=${ur_stat(0)} rings=${ur_stat(3)} enobufs=${ur_stat(1)} rearms=${ur_stat(4)} sweeps=${ur_stat(5)} " +
+                    "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)} walw=${db_stat(4)} walpw=${db_stat(5)} " +
+                    "commits loop=${db_stat(6)} thread=${db_stat(7)} busy=${db_stat(8)} slow=${db_stat(9)} ckslow=${db_stat(10)}" +
                     if (PROF) " | ms: poll+wait=${tPoll / 1000000} dbread=${tRead / 1000000} (${nReads} reads) " +
                         "batch=${tBatch / 1000000} loop=${tAll / 1000000} passes=$nPasses" else "")
                 for (r in 0 until 8) if (ur_stat(100 + r) < 0) break
@@ -469,7 +477,8 @@ class Server(private val jwt: Jwt) {
 
     // ---------------------------------------------------------------- group commit
 
-    /** Hands the queued writes to the committer thread (csrc/db.c), unless a batch is still being committed. */
+    /** Commits the queued writes (on the loop, or hands them to the committer thread: csrc/db.c), unless a batch is
+     *  still being committed. */
     private fun startBatch() {
         if (inFlight.isNotEmpty()) return
         val ops = writes
@@ -484,10 +493,11 @@ class Server(private val jwt: Jwt) {
         }
         writes = inFlight
         inFlight = ops
-        db_wq_start()
+        if (db_wq_start() == 2) finishBatch()   // committed on the loop: answer now
     }
 
-    /** The committer thread signalled: if the batch is committed, answer everybody and resume their pipelined input. */
+    /** The batch is committed (on the loop, or the committer thread signalled): answer everybody and resume their
+     *  pipelined input. */
     private fun finishBatch() {
         val n = db_wq_done()
         if (n < 0) return

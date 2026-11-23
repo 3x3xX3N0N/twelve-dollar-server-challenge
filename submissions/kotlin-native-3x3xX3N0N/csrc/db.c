@@ -26,7 +26,10 @@
 
 static sqlite3 *rdb, *wdb;
 static sqlite3_stmt *st_rbegin, *st_rcommit, *st_health, *st_feed_sql, *st_post_sql;
-static sqlite3_stmt *st_wbegin, *st_wcommit, *st_wrollback, *st_insert, *st_exists, *st_like;
+/* The group-commit statements, once per connection that may commit: the reader (on the loop, the default) and the
+ * writer (the committer thread: KN_COMMITTER=1, or the fallback after a slow commit). */
+typedef struct wstmts { sqlite3 *db; sqlite3_stmt *begin, *commit, *rollback, *insert, *exists, *like; } wstmts;
+static wstmts W_loop, W_thr;
 static char g_path[4096];
 static char g_vfs[64];
 static int rd_open;                 /* reader holds a read transaction (snapshot) */
@@ -34,8 +37,43 @@ static int use_btree;
 static atomic_int ckpt_want;        /* checkpointer waits for readers to leave their snapshot */
 static int64_t n_bt, n_sql, n_snap;
 static int keep_snapshot = 1;      /* KN_SNAPSHOT=0: a new read transaction every loop pass (for measuring) */
-
+/* Where the group commit runs.
+ * Default: on the loop, on the reader connection. A COMMIT by another connection makes the reader drop its whole page
+ * cache at its next read transaction (SQLite's WAL-index header check, pager_reset), so with a separate committer
+ * connection most post reads cost a pread. Committing on the reader's own connection keeps its cache.
+ * Finding and measurement: b2-jvm (kotlin-jvm-uring-3x3xX3N0N). KN_COMMITTER=1: always the committer thread.
+ * Slow-disk guard: a COMMIT on the loop blocks the loop for as long as its WAL write() takes. If one takes longer than
+ * KN_SLOW_MS (default 50 ms), or a checkpoint pass takes longer than KN_SLOW_CK_MS (default 200 ms: the checkpointer's
+ * fsync is the first to feel a slow disk),
+ * the next commits go to the committer thread (own connection, the loop keeps serving reads) for slow_hold ms,
+ * starting at KN_SLOW_HOLD_MS (10 s); while commits or checkpoints stay slow the period is extended (doubling, up to
+ * 5 min), so the loop only takes the commits back after the disk has been fast for a whole period. */
+static int committer_only;
+static int ol_pending;              /* on the loop: a batch is staged but BEGIN IMMEDIATE was busy (checkpoint hold) */
+static int64_t slow_ns = 50000000, slow_ck_ns = 200000000, slow_hold_ms = 10000, slow_hold0_ms = 10000;
+static _Atomic int64_t thr_until_ns;   /* commits go to the committer thread until then (slow-disk guard) */
+static int64_t n_ol_commits, n_thr_commits, n_ol_busy, n_slow;
+static _Atomic int64_t n_ck_slow;
+static int test_wal_delay_us;       /* KN_TEST_WAL_DELAY_US: sleep in every WAL write (tests the slow-disk guard) */
+static void ol_try(void);
 static int64_t now_ns(void);
+static pthread_mutex_t slow_mu = PTHREAD_MUTEX_INITIALIZER;
+/* A slow write or checkpoint was seen (any thread): commits go to the committer thread for a while (see above). */
+static void slow_seen(void) {
+    static int64_t since;   /* start of the current period */
+    if (committer_only) return;
+    pthread_mutex_lock(&slow_mu);
+    int64_t t = now_ns();
+    if (t >= thr_until_ns) {   /* a new period; after a long calm the length starts over */
+        if (t - thr_until_ns > 4 * slow_hold_ms * 1000000) slow_hold_ms = slow_hold0_ms;
+        since = t;
+    } else if (t - since > slow_hold_ms * 500000 && slow_hold_ms < 300000) {   /* still slow late in the period */
+        slow_hold_ms *= 2;
+        since = t;
+    }
+    thr_until_ns = t + slow_hold_ms * 1000000;
+    pthread_mutex_unlock(&slow_mu);
+}
 
 /* ------------------------------------------------------------------ helpers */
 static int prep(sqlite3 *db, const char *sql, sqlite3_stmt **st, char *err, int errcap) {
@@ -107,8 +145,11 @@ static void rd_end(void) {
     rd_open = 0;
 }
 
-void db_pass_end(void) {
+int db_pass_end(void) {
+    int done = 0;
+    if (ol_pending) { ol_try(); done = !ol_pending; }
     if (rd_open && (!keep_snapshot || atomic_load_explicit(&ckpt_want, memory_order_relaxed))) rd_end();
+    return done;
 }
 
 /* ------------------------------------------------------------------ page cache: pcache1 with its own xRekey
@@ -184,6 +225,7 @@ static int64_t n_wal_writes, n_wal_flushes;
 
 static int wv_flush(walf *f) {
     int rc = SQLITE_OK, done = 0;
+    if (test_wal_delay_us && f->len) usleep((useconds_t)test_wal_delay_us);
     while (rc == SQLITE_OK && done < f->len) {
         int n = f->len - done;
         if (n > 0x1ffff) n = 0x1ffff;
@@ -280,6 +322,23 @@ static const char *wv_install(const char *base) {
 }
 
 /* ------------------------------------------------------------------ open */
+#ifndef CACHE_KB_DEFAULT
+#define CACHE_KB_DEFAULT 65536
+#endif
+
+static int wprep(wstmts *w, sqlite3 *db, char *err, int errcap) {
+    w->db = db;
+    return prep(db, "BEGIN IMMEDIATE", &w->begin, err, errcap) ||
+        prep(db, "COMMIT", &w->commit, err, errcap) ||
+        prep(db, "ROLLBACK", &w->rollback, err, errcap) ||
+        prep(db, "INSERT INTO posts(user_id,body) VALUES(?1,?2) RETURNING '{\"post\":'||"
+                 "json_object('id',id,'body',body,'created_at',created_at,'author',?3,'like_count',0)||'}'",
+             &w->insert, err, errcap) ||
+        prep(db, "SELECT 1 FROM posts WHERE id=?1", &w->exists, err, errcap) ||
+        prep(db, "INSERT INTO likes(user_id,post_id) VALUES(?1,?2) ON CONFLICT(user_id,post_id) DO NOTHING",
+             &w->like, err, errcap);
+}
+
 #define POST_JSON \
     "json_object('id',p.id,'body',p.body,'created_at',p.created_at,'author',u.username," \
     "'like_count',(SELECT count(*) FROM likes l WHERE l.post_id=p.id))"
@@ -291,9 +350,16 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     const char *wv = wv_install(g_vfs);
     if (wv) snprintf(g_vfs, sizeof g_vfs, "%s", wv);
     keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
-    /* Reads get 64 MiB of page cache; the writer and the checkpointer touch far fewer pages (16 MiB / 2 MiB): at
-     * ~400k connections the 2 GB box is short of memory, not CPU. */
-    if (open_conn(&rdb, 5000, err, errcap, "PRAGMA cache_size=-65536") ||
+    committer_only = getenv("KN_COMMITTER") && getenv("KN_COMMITTER")[0] == '1';
+    if (getenv("KN_SLOW_MS")) slow_ns = atoll(getenv("KN_SLOW_MS")) * 1000000;
+    if (getenv("KN_SLOW_CK_MS")) slow_ck_ns = atoll(getenv("KN_SLOW_CK_MS")) * 1000000;
+    if (getenv("KN_SLOW_HOLD_MS")) slow_hold_ms = slow_hold0_ms = atoll(getenv("KN_SLOW_HOLD_MS"));
+    if (getenv("KN_TEST_WAL_DELAY_US")) test_wal_delay_us = atoi(getenv("KN_TEST_WAL_DELAY_US"));
+    /* Reader page cache (KN_CACHE_KB, default CACHE_KB_DEFAULT); the writer and the checkpointer touch far fewer
+     * pages (16 MiB / 2 MiB): at ~400k connections the 2 GB box is short of memory, not CPU. */
+    char rcache[64];
+    snprintf(rcache, sizeof rcache, "PRAGMA cache_size=-%d", getenv("KN_CACHE_KB") ? atoi(getenv("KN_CACHE_KB")) : CACHE_KB_DEFAULT);
+    if (open_conn(&rdb, 5000, err, errcap, rcache) ||
         /* The committer thread is off the loop, so its BEGIN can wait out a checkpoint hold that a slow disk
          * stretches (measured: 2 x 1 s was not enough at 416k users on a busy disk; 15 likes got a 500). */
         open_conn(&wdb, 10000, err, errcap, "PRAGMA cache_size=-16384")) return -1;
@@ -306,15 +372,7 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
              "ORDER BY p.created_at DESC,p.id DESC LIMIT 20)", &st_feed_sql, err, errcap) ||
         prep(rdb, "SELECT '{\"post\":'||" POST_JSON "||'}' FROM posts p JOIN users u ON u.id=p.user_id WHERE p.id=?1",
              &st_post_sql, err, errcap) ||
-        prep(wdb, "BEGIN IMMEDIATE", &st_wbegin, err, errcap) ||
-        prep(wdb, "COMMIT", &st_wcommit, err, errcap) ||
-        prep(wdb, "ROLLBACK", &st_wrollback, err, errcap) ||
-        prep(wdb, "INSERT INTO posts(user_id,body) VALUES(?1,?2) RETURNING '{\"post\":'||"
-                  "json_object('id',id,'body',body,'created_at',created_at,'author',?3,'like_count',0)||'}'",
-             &st_insert, err, errcap) ||
-        prep(wdb, "SELECT 1 FROM posts WHERE id=?1", &st_exists, err, errcap) ||
-        prep(wdb, "INSERT INTO likes(user_id,post_id) VALUES(?1,?2) ON CONFLICT(user_id,post_id) DO NOTHING",
-             &st_like, err, errcap)) return -1;
+        wprep(&W_loop, rdb, err, errcap) || wprep(&W_thr, wdb, err, errcap)) return -1;
     use_btree = 0;
     if (btree) {
         char why[256];
@@ -374,7 +432,7 @@ int db_post(int64_t id, uint8_t *out, int cap) {
     return post_sql(id, out, cap);
 }
 
-/* ------------------------------------------------------------------ writes (committer thread) */
+/* ------------------------------------------------------------------ writes (group commit: on the loop, or the committer thread) */
 typedef struct wop {
     int kind;                 /* 0 like, 1 post */
     int64_t uid, pid;
@@ -445,6 +503,13 @@ int db_wq_start(void) {
     inflight = staging;
     staging = staging == &wb[0] ? &wb[1] : &wb[0];
     staging->n = 0; staging->alen = 0;
+    if (!committer_only && now_ns() >= thr_until_ns) {
+        /* on the loop: now, or at a later pass end (db_pass_end) if a checkpoint holds the write lock */
+        pthread_mutex_unlock(&wq_mu);
+        ol_pending = 1;
+        ol_try();
+        return ol_pending ? 0 : 2;
+    }
     wq_state = 1;
     pthread_cond_signal(&wq_cv);
     pthread_mutex_unlock(&wq_mu);
@@ -452,7 +517,7 @@ int db_wq_start(void) {
 }
 
 int db_wq_done(void) {
-    if (!inflight) return -1;
+    if (!inflight || ol_pending) return -1;
     pthread_mutex_lock(&wq_mu);
     int done = wq_state == 2;
     pthread_mutex_unlock(&wq_mu);
@@ -479,44 +544,80 @@ void db_wq_release(void) {
     rd_end();   /* the next read takes a new snapshot that includes this commit */
 }
 
-/* One batch: BEGIN IMMEDIATE (waits out a checkpoint hold here, off the loop), the statements, COMMIT. */
+static void run_body(wstmts *w, wbatch *b, int rc);
+
+/* On the committer thread: BEGIN IMMEDIATE (waits out a checkpoint hold here, off the loop), the statements, COMMIT.
+ * After a slow commit here the fallback period doubles (up to 5 min); a fast one lets it end on schedule. */
 static void run_batch(wbatch *b) {
+    int64_t t0 = now_ns();
     int rc = SQLITE_BUSY;
-    for (int tries = 0; tries < 2 && (rc & 0xff) == SQLITE_BUSY; tries++) rc = step_reset(st_wbegin);
+    for (int tries = 0; tries < 2 && (rc & 0xff) == SQLITE_BUSY; tries++) rc = step_reset(W_thr.begin);
+    run_body(&W_thr, b, rc);
+    n_thr_commits++;
+    if (now_ns() - t0 > slow_ns) slow_seen();
+}
+
+/* On the loop, on the reader connection: BEGIN IMMEDIATE without waiting (a checkpoint RESTART can hold the write
+ * lock; then the batch stays staged and the next pass end tries again while reads go on), the statements, COMMIT.
+ * Results are ready when this returns with ol_pending == 0 (the loop answers them at once, no eventfd). */
+static void ol_try(void) {
+    rd_end();   /* BEGIN IMMEDIATE needs the connection out of its read transaction */
+    int64_t t0 = now_ns();
+    sqlite3_busy_timeout(rdb, 0);
+    int rc = step_reset(W_loop.begin);
+    sqlite3_busy_timeout(rdb, 5000);
+    if ((rc & 0xff) == SQLITE_BUSY) { n_ol_busy++; return; }
+    ol_pending = 0;
+    run_body(&W_loop, inflight, rc);
+    n_ol_commits++;
+    int64_t dt = now_ns() - t0;
+    if (dt > slow_ns) {
+        n_slow++;
+        slow_seen();
+        fprintf(stderr, "group commit: slow commit on the loop (%lld ms, %d writes): committer thread for %lld s\n",
+                (long long)(dt / 1000000), inflight->n, (long long)(slow_hold_ms / 1000));
+    }
+    pthread_mutex_lock(&wq_mu);
+    wq_state = 2;
+    pthread_mutex_unlock(&wq_mu);
+}
+
+static void run_body(wstmts *w, wbatch *b, int rc) {
+    sqlite3 *db = w->db;
     int ok = rc == SQLITE_OK;
-    if (!ok) fprintf(stderr, "group commit: BEGIN: %s\n", sqlite3_errmsg(wdb));
+    if (!ok) fprintf(stderr, "group commit: BEGIN: %s\n", sqlite3_errmsg(db));
     for (int i = 0; ok && i < b->n; i++) {
         wop *o = &b->ops[i];
         if (o->kind == 0) {
-            sqlite3_bind_int64(st_exists, 1, o->pid);
-            rc = sqlite3_step(st_exists);
-            sqlite3_reset(st_exists);
+            sqlite3_bind_int64(w->exists, 1, o->pid);
+            rc = sqlite3_step(w->exists);
+            sqlite3_reset(w->exists);
             if (rc == SQLITE_DONE) { o->code = -1; continue; }
             if (rc != SQLITE_ROW) { o->code = -2; continue; }
-            sqlite3_bind_int64(st_like, 1, o->uid);
-            sqlite3_bind_int64(st_like, 2, o->pid);
-            rc = sqlite3_step(st_like);
-            sqlite3_reset(st_like);
-            o->code = rc != SQLITE_DONE ? -2 : sqlite3_changes(wdb) > 0 ? 1 : 0;
+            sqlite3_bind_int64(w->like, 1, o->uid);
+            sqlite3_bind_int64(w->like, 2, o->pid);
+            rc = sqlite3_step(w->like);
+            sqlite3_reset(w->like);
+            o->code = rc != SQLITE_DONE ? -2 : sqlite3_changes(db) > 0 ? 1 : 0;
         } else {
-            sqlite3_bind_int64(st_insert, 1, o->uid);
-            sqlite3_bind_text(st_insert, 2, (const char *)b->arena + o->boff, o->blen, SQLITE_TRANSIENT);
-            sqlite3_bind_text(st_insert, 3, (const char *)b->arena + o->aoff, o->alen, SQLITE_TRANSIENT);
+            sqlite3_bind_int64(w->insert, 1, o->uid);
+            sqlite3_bind_text(w->insert, 2, (const char *)b->arena + o->boff, o->blen, SQLITE_TRANSIENT);
+            sqlite3_bind_text(w->insert, 3, (const char *)b->arena + o->aoff, o->alen, SQLITE_TRANSIENT);
             o->code = -2;
-            if (sqlite3_step(st_insert) == SQLITE_ROW) {
-                int n = sqlite3_column_bytes(st_insert, 0);
-                const unsigned char *t = sqlite3_column_text(st_insert, 0);
+            if (sqlite3_step(w->insert) == SQLITE_ROW) {
+                int n = sqlite3_column_bytes(w->insert, 0);
+                const unsigned char *t = sqlite3_column_text(w->insert, 0);
                 int off = t ? arena_put(b, t, n) : -1;
                 if (off >= 0) { o->joff = off; o->jlen = n; o->code = 201; }
-                while (sqlite3_step(st_insert) == SQLITE_ROW) {}
+                while (sqlite3_step(w->insert) == SQLITE_ROW) {}
             }
-            sqlite3_reset(st_insert);
-            sqlite3_clear_bindings(st_insert);
+            sqlite3_reset(w->insert);
+            sqlite3_clear_bindings(w->insert);
         }
     }
-    if (ok && step_reset(st_wcommit) != SQLITE_OK) {
-        fprintf(stderr, "group commit: COMMIT: %s\n", sqlite3_errmsg(wdb));
-        step_reset(st_wrollback);
+    if (ok && step_reset(w->commit) != SQLITE_OK) {
+        fprintf(stderr, "group commit: COMMIT: %s\n", sqlite3_errmsg(db));
+        step_reset(w->rollback);
         ok = 0;
     }
     if (!ok) for (int i = 0; i < b->n; i++) b->ops[i].code = -2;
@@ -605,6 +706,11 @@ int64_t db_stat(int which) {
     case 3: return n_parked;
     case 4: return n_wal_writes;
     case 5: return n_wal_flushes;
+    case 6: return n_ol_commits;
+    case 7: return n_thr_commits;
+    case 8: return n_ol_busy;
+    case 9: return n_slow;
+    case 10: return n_ck_slow;
     default: return 0;
     }
 }
@@ -635,7 +741,9 @@ static void *ckpt_main(void *arg) {
     for (;;) {
         usleep(CK_TICK_MS * 1000);
         int log = 0, copied = 0;
+        int64_t tp = now_ns();
         sqlite3_wal_checkpoint_v2(c, 0, SQLITE_CHECKPOINT_PASSIVE, &log, &copied);
+        if (now_ns() - tp > slow_ck_ns) { n_ck_slow++; slow_seen(); }   /* slow disk: keep commits off the loop */
         if (log > maxlog) maxlog = log;
         if (log >= CK_RESTART_FRAMES && log - copied <= CK_TAIL_FRAMES) {
             /* RESTART takes the WAL write lock (our writer's BEGIN IMMEDIATE gets SQLITE_BUSY and retries next pass),
