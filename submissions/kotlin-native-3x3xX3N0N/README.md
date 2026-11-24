@@ -30,8 +30,8 @@ compiled in. The C side is kernel and SQLite plumbing only.
   every non-empty pass, then collects every ring. Measured: −0.6 µs/req at 160k (3 pairs), but +1.4/+1.7 µs/req and
   reads p95 8 → 69 ms at 256k (2 pairs), so batch wake stays the default.
 - 512 single-shot accepts in flight (multishot accept into a direct table lost connections for another entry).
-- Multishot receive into a provided-buffer ring (1,024 × 2 KB per ring): an idle connection owns no buffer. Buffers go
-  back after each pass. A receive that runs out of buffers (`ENOBUFS`) is re-armed later, at most 256 per pass.
+- Multishot receive into a provided-buffer ring (4,096 × 2 KB per ring): an idle connection owns no buffer. Buffers go
+  back after each pass. A receive that runs out of buffers (`ENOBUFS`) is re-armed once the pass's buffers are back.
 - Each response is copied once into a send request; a short write resubmits the rest; output behind an in-flight send
   is queued so the order on the wire is kept. A `Connection: close` ends with `shutdown`, and the slot is closed when
   the receive sees the end.
@@ -189,7 +189,7 @@ commit, default 20000 / 1024), `KN_PACE_NR` / `KN_PACE_US` (batch wake, default 
 (commit on the committer thread always), `KN_SLOW_MS` / `KN_SLOW_CK_MS` / `KN_SLOW_MEM_PCT` / `KN_SLOW_HOLD_MS` (slow-disk
 guard, default 50 / 200 / 90 / 10000; `KN_SLOW_MEM_PCT=0` = no memory trigger), `KN_CACHE_KB` (reader page cache, default 65536), `KN_MAX_EV` (events per pass, default 4096), `KN_LISTENERS` (1-8),
 `KN_HDR=0` (the old two-pass head parser), `KN_MLOCK=0`, `KN_RINGS`, `KN_NBUF` (provided receive buffers per ring, a power
-of two, default 1024), `KN_REARM` (receives re-armed per pass after `ENOBUFS`, default 256, 0 = all), `KN_STATS=1` /
+of two, default 4096), `KN_REARM` (receives re-armed per pass after `ENOBUFS`, default 0 = all), `KN_STATS=1` /
 `KN_PROF=1` / `KN_CKPT_LOG=1` (counters on stdout/stderr every 10 s; `KN_STATS` also counts why connections ended, by
 errno), `KN_STALLS=1` (log passes over 100 ms), `KN_VERIFY=1` (the byte-for-byte
 check above). Build: `KN_CPGO=0` (no profile), `KN_CFLAGS`, `KN_TRAIN_PORT` / `KN_TRAIN_REQS` / `KN_TRAIN_CONNS` /

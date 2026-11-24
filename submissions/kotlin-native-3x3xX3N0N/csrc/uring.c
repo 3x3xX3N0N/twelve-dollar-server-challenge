@@ -7,7 +7,7 @@
  *   entry); new accepts stop FD_MARGIN slots before a table is full and go to the next ring instead.
  * - Multishot recv with a provided-buffer ring per ring: an idle connection owns no buffer. Buffers go back to the
  *   ring right after Kotlin has handled the pass (ur_done). A receive that ran out of buffers (ENOBUFS) is re-armed
- *   later, at most REARM_MAX per pass, after the pass's buffers are back.
+ *   after the pass's buffers are back (all of them by default; KN_REARM bounds it per pass).
  * - Sends copy the response into one malloc'd request (pointer-tagged user_data), resubmit on a short write, and
  *   queue later output behind an in-flight send so the order on the wire is kept.
  * - Secondary rings signal one eventfd that ring 0 reads, so the thread sleeps in one io_uring_enter.
@@ -37,11 +37,13 @@
 #define MAX_RINGS 8
 #define SQ_ENTRIES 4096
 #define CQ_ENTRIES 32768
-#define NBUF_DEFAULT 1024    /* provided buffers per ring (power of two, KN_NBUF); ENOBUFS never seen at 384k users */
+#define NBUF_DEFAULT 4096    /* provided buffers per ring (power of two, KN_NBUF). 1024 ran out at the ramp end on a
+                                1 vCPU 6.8 VM (23k ENOBUFS, p99 1.2 s at 160k users); 4096: 3k ENOBUFS, p99 0.3-0.5 s */
 #define BUFSZ 2048
 #define ACCEPT_DEPTH 512
 #define FD_MARGIN 256
-#define REARM_DEFAULT 256    /* receives re-armed per pass after ENOBUFS (KN_REARM; 0 = all) */
+#define REARM_DEFAULT 0      /* receives re-armed per pass after ENOBUFS (KN_REARM; 0 = all). 256 per pass left a
+                                burst of 8-23k starved receives waiting 30-90 passes (seconds) on the VM */
 #define DEFER_IDLE_US 1000   /* longest sleep on ring 0 while secondary rings (DEFER_TASKRUN) exist */
 
 enum { K_ACCEPT = 1, K_RECV = 2, K_SEND = 3, K_CLOSE = 4, K_SHUT = 5, K_EVFD = 6, K_WATCH = 7 };
@@ -85,7 +87,7 @@ static int64_t st_sweep_enters;
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
-static int NBUF = NBUF_DEFAULT, REARM_MAX = REARM_DEFAULT;
+static int NBUF = NBUF_DEFAULT, REARM_MAX = REARM_DEFAULT > 0 ? REARM_DEFAULT : 1 << 20;
 static int64_t st_recv_eof, st_recv_err[160], st_send_err[160], st_send_zero, st_shuts;   /* why connections end (KN_STATS) */
 static int64_t st_open, st_enobufs, st_accept_err, st_rearms;
 static int64_t st_cqe[MAX_RINGS], st_acc_ok[MAX_RINGS];
