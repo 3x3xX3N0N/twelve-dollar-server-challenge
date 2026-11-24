@@ -1,0 +1,7 @@
+kn-final: passed=42 failed=0
+kn-b3: passed=42 failed=0
+jvm-uring: passed=42 failed=0
+graal-ce: passed=42 failed=0
+graal-nocpgo: passed=42 failed=0
+nio-v3: passed=42 failed=0
+dav: passed=42 failed=0
