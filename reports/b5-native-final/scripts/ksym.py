@@ -48,7 +48,7 @@ BUCKETS = [  # (bucket, substrings of any frame in the chain, checked in order)
     ('futex/sched', ('futex', 'schedule', '__schedule')),
     ('page faults / mm', ('asm_exc_page_fault', 'handle_mm_fault', 'do_user_addr_fault')),
 ]
-selfc = collections.Counter(); kb = collections.Counter(); n = len(samples); kern = 0
+selfc = collections.Counter(); kb = collections.Counter(); other = collections.Counter(); n = len(samples); kern = 0
 for s in samples:
     if not s: continue
     ip, sym, dso = s[0]
@@ -60,6 +60,7 @@ for s in samples:
         for name, keys in BUCKETS:
             if any(k in c for c in chain for k in keys): b = name; break
         kb[b] += 1
+        if b == 'other kernel': other[' < '.join(chain[:4])] += 1
     else:
         selfc[sym if sym and sym != '[unknown]' else dso] += 1
 print(f'samples {n}, kernel {kern} ({kern / n * 100:.1f} %), slide {slide:#x}')
@@ -67,3 +68,5 @@ print('-- kernel buckets (share of all samples; first match in the order listed)
 for b, c in kb.most_common(): print(f'{c / n * 100:6.2f} %  {b}')
 print(f'-- top {top} self')
 for k, c in selfc.most_common(top): print(f'{c / n * 100:6.2f} %  {k}')
+print('-- other kernel: top chains (innermost first)')
+for k, c in other.most_common(8): print(f'{c / n * 100:6.2f} %  {k}')

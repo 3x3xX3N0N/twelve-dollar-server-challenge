@@ -121,6 +121,7 @@ if [ "${KN_CPGO:-1}" = 1 ]; then
     build_c use
   else
     echo "!! PGO training failed: falling back to the plain build" >&2
+    rm -rf "$B/train"
     build_c plain
   fi
 else

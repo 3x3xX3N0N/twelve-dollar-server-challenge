@@ -15,6 +15,7 @@
 #include "sqlite3.c"
 #include "kn.h"
 #include <pthread.h>
+#include <fcntl.h>
 #include <sys/eventfd.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -44,7 +45,8 @@ static int keep_snapshot = 1;      /* KN_SNAPSHOT=0: a new read transaction ever
  * Finding and measurement: b2-jvm (kotlin-jvm-uring-3x3xX3N0N). KN_COMMITTER=1: always the committer thread.
  * Slow-disk guard: a COMMIT on the loop blocks the loop for as long as its WAL write() takes. If one takes longer than
  * KN_SLOW_MS (default 50 ms), or a checkpoint pass takes longer than KN_SLOW_CK_MS (default 200 ms: the checkpointer's
- * fsync is the first to feel a slow disk),
+ * fsync is the first to feel a slow disk), or memory use passes KN_SLOW_MEM_PCT (default 90 %) of the cgroup limit or
+ * of RAM (near the wall, reclaim makes writes stall for seconds: two 2 s commits at 448k users locally),
  * the next commits go to the committer thread (own connection, the loop keeps serving reads) for slow_hold ms,
  * starting at KN_SLOW_HOLD_MS (10 s); while commits or checkpoints stay slow the period is extended (doubling, up to
  * 5 min), so the loop only takes the commits back after the disk has been fast for a whole period. */
@@ -53,7 +55,8 @@ static int ol_pending;              /* on the loop: a batch is staged but BEGIN 
 static int64_t slow_ns = 50000000, slow_ck_ns = 200000000, slow_hold_ms = 10000, slow_hold0_ms = 10000;
 static _Atomic int64_t thr_until_ns;   /* commits go to the committer thread until then (slow-disk guard) */
 static int64_t n_ol_commits, n_thr_commits, n_ol_busy, n_slow;
-static _Atomic int64_t n_ck_slow;
+static _Atomic int64_t n_ck_slow, n_mem_slow;
+static int slow_mem_pct = 90;
 static int test_wal_delay_us;       /* KN_TEST_WAL_DELAY_US: sleep in every WAL write (tests the slow-disk guard) */
 static void ol_try(void);
 static int64_t now_ns(void);
@@ -352,6 +355,7 @@ int db_open(const char *path, const char *vfs, int btree, char *err, int errcap)
     keep_snapshot = !(getenv("KN_SNAPSHOT") && getenv("KN_SNAPSHOT")[0] == '0');
     committer_only = getenv("KN_COMMITTER") && getenv("KN_COMMITTER")[0] == '1';
     if (getenv("KN_SLOW_MS")) slow_ns = atoll(getenv("KN_SLOW_MS")) * 1000000;
+    if (getenv("KN_SLOW_MEM_PCT")) slow_mem_pct = atoi(getenv("KN_SLOW_MEM_PCT"));
     if (getenv("KN_SLOW_CK_MS")) slow_ck_ns = atoll(getenv("KN_SLOW_CK_MS")) * 1000000;
     if (getenv("KN_SLOW_HOLD_MS")) slow_hold_ms = slow_hold0_ms = atoll(getenv("KN_SLOW_HOLD_MS"));
     if (getenv("KN_TEST_WAL_DELAY_US")) test_wal_delay_us = atoi(getenv("KN_TEST_WAL_DELAY_US"));
@@ -711,8 +715,59 @@ int64_t db_stat(int which) {
     case 8: return n_ol_busy;
     case 9: return n_slow;
     case 10: return n_ck_slow;
+    case 11: return n_mem_slow;
     default: return 0;
     }
+}
+
+/* ------------------------------------------------------------------ memory use (for the slow-disk guard)
+ * The cgroup's memory.current / memory.max if this process's cgroup (v2) has a limit, else 1 - MemAvailable /
+ * MemTotal. Files stay open and are re-read with pread. Returns percent, or -1 if unknown. */
+static int mem_cur = -1, mem_info = -1;
+static int64_t mem_max;
+
+static int64_t read_num(int fd, const char *key) {
+    char b[4096];
+    ssize_t n = pread(fd, b, sizeof b - 1, 0);
+    if (n <= 0) return -1;
+    b[n] = 0;
+    if (!key) return atoll(b);
+    char *p = strstr(b, key);
+    return p ? atoll(p + strlen(key)) : -1;
+}
+
+static void mem_init(void) {
+    FILE *f = fopen("/proc/self/cgroup", "r");
+    char line[4096], path[4400];
+    if (f) {
+        while (fgets(line, sizeof line, f)) {
+            if (strncmp(line, "0::", 3)) continue;
+            line[strcspn(line, "\n")] = 0;
+            snprintf(path, sizeof path, "/sys/fs/cgroup%s/memory.max", line + 3);
+            int fd = open(path, O_RDONLY | O_CLOEXEC);
+            if (fd >= 0) {
+                char b[64];
+                ssize_t n = pread(fd, b, sizeof b - 1, 0);
+                close(fd);
+                if (n > 0 && b[0] >= '0' && b[0] <= '9') {
+                    mem_max = atoll(b);
+                    snprintf(path, sizeof path, "/sys/fs/cgroup%s/memory.current", line + 3);
+                    mem_cur = open(path, O_RDONLY | O_CLOEXEC);
+                }
+            }
+        }
+        fclose(f);
+    }
+    if (mem_cur < 0) mem_info = open("/proc/meminfo", O_RDONLY | O_CLOEXEC);
+}
+
+static int mem_pct(void) {
+    if (mem_cur >= 0 && mem_max > 0) { int64_t c = read_num(mem_cur, 0); return c < 0 ? -1 : (int)(c * 100 / mem_max); }
+    if (mem_info >= 0) {
+        int64_t t = read_num(mem_info, "MemTotal:"), a = read_num(mem_info, "MemAvailable:");
+        return t > 0 && a >= 0 ? (int)(100 - a * 100 / t) : -1;
+    }
+    return -1;
 }
 
 /* ------------------------------------------------------------------ checkpointer */
@@ -737,6 +792,7 @@ static void *ckpt_main(void *arg) {
     if (open_conn(&c, CK_HOLD_MS, err, sizeof err, "PRAGMA cache_size=-2048")) { fprintf(stderr, "checkpointer: %s\n", err); return 0; }
     int logst = getenv("KN_CKPT_LOG") && getenv("KN_CKPT_LOG")[0] == '1';
     int64_t last = now_ns(), maxhold = 0, sumhold = 0;
+    mem_init();
     int restarts = 0, fails = 0, maxlog = 0;
     for (;;) {
         usleep(CK_TICK_MS * 1000);
@@ -744,6 +800,7 @@ static void *ckpt_main(void *arg) {
         int64_t tp = now_ns();
         sqlite3_wal_checkpoint_v2(c, 0, SQLITE_CHECKPOINT_PASSIVE, &log, &copied);
         if (now_ns() - tp > slow_ck_ns) { n_ck_slow++; slow_seen(); }   /* slow disk: keep commits off the loop */
+        if (slow_mem_pct > 0 && slow_mem_pct < 100 && mem_pct() >= slow_mem_pct) { n_mem_slow++; slow_seen(); }
         if (log > maxlog) maxlog = log;
         if (log >= CK_RESTART_FRAMES && log - copied <= CK_TAIL_FRAMES) {
             /* RESTART takes the WAL write lock (our writer's BEGIN IMMEDIATE gets SQLITE_BUSY and retries next pass),

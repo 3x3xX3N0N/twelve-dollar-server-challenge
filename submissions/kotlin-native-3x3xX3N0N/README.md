@@ -10,7 +10,7 @@ compiled in. The C side is kernel and SQLite plumbing only.
 | Framework | none (`src/Server.kt`) |
 | io_uring | liburing 2.9 (MIT), fetched by `build.sh` at its release tag, sha256-checked, called from `csrc/uring.c` |
 | SQLite | 3.54.1 amalgamation, unchanged, SHA3-256-checked against sqlite.org, compiled into `csrc/db.c` |
-| C compiler | the clang + glibc sysroot that ship with Kotlin/Native (so the C objects match its linker) |
+| C compiler | the clang + glibc sysroot that ship with Kotlin/Native (so the C objects match its linker), profile-guided: trained in `build.sh` on a synthetic database |
 | Nginx or direct | **Direct**: serves `HOST:PORT` itself (`0.0.0.0:80` on the benchmark box) |
 | Needs | Linux 6.0+ io_uring (multishot receive, provided-buffer rings, direct descriptors). No epoll fallback |
 
@@ -24,6 +24,11 @@ compiled in. The C side is kernel and SQLite plumbing only.
 - **Batch wake**: after a light pass the loop waits on ring 0 alone for 256 completions or 1 ms (or the group-commit
   deadline), then collects every ring. At 160k users: 8.2k → 1.9k loop passes a second, −6-11 % CPU per request,
   reads p95 0.3 → 2.2 ms. (`DEFER_TASKRUN` is a knob, off: together with this wait it failed reads at 256k users.)
+- `KN_PASS=sweep` (knob, off) is java-iouring-davidhsv's pass structure instead: every ring `DEFER_TASKRUN`; each
+  pass first sweeps the secondary rings without waiting (submit, run their deferred completions; a second enter
+  with a zero timeout if the kernel still flags task work), then waits on ring 0 for 256 completions or 1 ms after
+  every non-empty pass, then collects every ring. Measured: −0.6 µs/req at 160k (3 pairs), but +1.4/+1.7 µs/req and
+  reads p95 8 → 69 ms at 256k (2 pairs), so batch wake stays the default.
 - 512 single-shot accepts in flight (multishot accept into a direct table lost connections for another entry).
 - Multishot receive into a provided-buffer ring (1,024 × 2 KB per ring): an idle connection owns no buffer. Buffers go
   back after each pass. A receive that runs out of buffers (`ENOBUFS`) is re-armed later, at most 256 per pass.
@@ -60,17 +65,30 @@ Authorization, Connection or Transfer-Encoding (any case, as before); parse time
 - Only cursors, `KeyInfo`s, prepared statements and four root page numbers are kept. No rows, no responses.
 
 **One read snapshot across loop passes** (idea: rust-iouring-rkkautsar). The reader connection keeps its read
-transaction open between passes and drops it right after our own writer commits (so a request that arrives after a
+transaction open between passes and drops it right before it commits a batch (so a request that arrives after a
 201 always sees that write) or when the checkpointer waits for readers. Fewer WAL read-lock round trips.
 
 **Writes and durability.** WAL, `synchronous=NORMAL`. Writes are queued and group-committed once the oldest has
-waited 20 ms or 1,024 are queued (was 2 ms / 64: the committer thread's CPU per request about halved, p95 2 → 8 ms;
-reads never wait for it). The commit runs on a **committer thread** with its own connection: `BEGIN IMMEDIATE`,
-the INSERTs, `COMMIT`; when it returns, the thread writes to an eventfd that ring 0 watches, and only then does the
-loop read the results and hand the 201s to the kernel. Meanwhile the loop keeps serving reads, and new writes queue
-for the next batch. (Measured reason: with the commit on the loop, a 5-minute hold at 352k users failed on p99
-because a few group commits took ~2 s in `pwrite` on a busy disk, and every read waited behind them.) A failed
-COMMIT answers every write of the batch with a 500.
+waited 20 ms or 1,024 are queued (reads never wait for it); the 201s go to the kernel only after `COMMIT` has
+returned. A failed COMMIT answers every write of the batch with a 500.
+- **The commit runs on the loop, on the reader's own connection** (default). A COMMIT by *another* connection makes
+  the reader drop its whole page cache at its next read transaction (SQLite's WAL-index header check), so with a
+  separate committer connection most post reads became a `pread` (finding of the JVM port, kotlin-jvm-uring). The
+  loop ends its read snapshot, runs `BEGIN IMMEDIATE` with busy timeout 0 (if a checkpoint RESTART holds the write
+  lock, the batch stays staged and every pass end retries while reads go on), the INSERTs, `COMMIT`, and answers at
+  once. Measured at 160k users: 14.8-15.2 → 14.0-14.9 µs/req (3 pairs), the committer thread's 0.7 µs/req gone.
+- **Slow-disk guard.** A COMMIT on the loop blocks the loop for as long as its WAL `write()` takes (on a busy disk a
+  few took ~2 s here once, and every read waited behind them; that is why the commit used to be on a thread). If an
+  on-loop commit takes more than 50 ms (`KN_SLOW_MS`), or a checkpoint pass more than 200 ms (`KN_SLOW_CK_MS`: its
+  fsync feels a slow disk first), or memory use reaches 90 % (`KN_SLOW_MEM_PCT`; the cgroup's `memory.current` /
+  `memory.max` if it has a limit, else `MemAvailable` / `MemTotal`; checked every 50 ms by the checkpointer thread:
+  near the wall, reclaim made two on-loop commits take ~2 s at 448k/480k users, the loop stopped draining sockets and
+  the server was OOM-killed; with this trigger 448k passes with p99 22 ms), the next commits go to the
+  **committer thread** with its own connection (the loop keeps serving reads; the thread wakes it through an
+  eventfd on ring 0) for 10 s (`KN_SLOW_HOLD_MS`), extended while commits, checkpoints or memory stay bad and
+  doubled when that lasts (up to 5 min); so at most one loop stall per slow spell.
+  Tested with an injected 200 ms delay in every WAL write: one 407 ms stall, then 66 commits on the thread while
+  `GET /feed` never took more than 50 ms. `KN_COMMITTER=1` = always the thread (the previous design).
 
 **One `pwrite` per commit.** A VFS of our own over the base VFS (public `sqlite3_vfs` API) changes only the WAL
 file's writes: SQLite writes each frame as two writes (24-byte header, page); writes that continue where the last one
@@ -86,12 +104,31 @@ whole hash table; here the page waits out the swap under key 0, which SQLite nev
 
 **Checkpoints off the loop.** A thread at nice 5 runs a PASSIVE checkpoint every 50 ms on its own connection; once
 the WAL has 4,096 frames and all but 128 are copied, a RESTART with a 250 ms busy timeout briefly holds the writer
-(the committer thread's `BEGIN` waits it out, off the loop) and the WAL starts over from frame 1.
+(the loop's `BEGIN IMMEDIATE` gets SQLITE_BUSY and retries at the next pass end) and the WAL starts over from frame 1.
 Idea credit: swift-iouring-akbashev, rust-iouring-kensac.
 
 **SQLite build options**: `SQLITE_THREADSAFE=2`, `SQLITE_ENABLE_QPSG` (plans fixed at prepare time),
 `SQLITE_DEFAULT_MEMSTATUS=0`, `SQLITE_OMIT_LOAD_EXTENSION`, `SQLITE_OMIT_DEPRECATED`, `SQLITE_OMIT_SHARED_CACHE`,
-`SQLITE_DQS=0`, `SQLITE_USE_ALLOCA`. Pragmas: `mmap_size=0`, `cache_size=-65536` (64 MiB), `wal_autocheckpoint=0`.
+`SQLITE_DQS=0`, `SQLITE_USE_ALLOCA`. Pragmas: `mmap_size=0`, `cache_size=-65536` (64 MiB, `KN_CACHE_KB`),
+`wal_autocheckpoint=0`. A 256 MiB reader cache (the whole 248 MB seed fits) measured no better at 160k users with the
+commit on the reader connection (14.1 vs 14.5 µs/req, 3 rounds), so it stays at 64 MiB (memory is the limit at the
+top). Rule 5 allows SQLite's own page cache explicitly, at any size.
+
+**Profile-guided C, trained on the box during the build.** `build.sh` first builds an instrumented server
+(`-fprofile-generate`, the Kotlin/Native clang's own profile runtime), writes a synthetic scratch database
+(`train/mkdb.c`: the schema, 20,000 users, 50,000 posts, ~200,000 likes from random CTEs, bodies with quotes,
+backslashes and non-ASCII; nothing from the seed), serves it on `127.0.0.1:KN_TRAIN_PORT` (3999) to a training client
+(`train/train.c`, 64 keep-alive connections running the load test's user loop without think time plus the test
+suite's error cases every 64th loop; HS256 tokens signed with the run's own random secret) for 200,000 requests
+(~8 s), stops it with SIGTERM (the instrumented build writes its profile then), merges the profile with the bundled
+`llvm-profdata`, and rebuilds the C with `-fprofile-use`. The profile exists only in `build/pgo` on the box; nothing
+is committed (LEADERBOARD, Arjay's 2026-11-15 ruling on rule 10: "profile-guided optimization is fine when
+`build.sh` records the profile on the box during the build (a training run on a scratch database)"). Time limits:
+mkdb 300 s, the server 1,200 s (SIGKILL), the client 600 s, health wait 60 s; any failure prints
+`!! PGO training failed` and builds without a profile. Measured: feed plan 6.1-6.2 → 4.9-5.1 µs per call (`KN_VERIFY`
+timing, 4 of 5 pairs), post plan −4 %; under load user CPU 5.0 → 4.3-4.5 µs/req. `KN_CPGO=0` = plain build.
+`-O3 -march=native` on top measured the same as `-O2` with the profile, so the default stays `-O2` (`KN_CFLAGS`).
+
 
 ## Measured (LOCAL, relative only)
 
@@ -100,32 +137,36 @@ i7-10700K desktop shared with other jobs, the server pinned to one core in a 2 G
 `bench/load.js`) in its own cgroup on other cores. A desktop core is faster than the droplet's vCPU, and loopback is
 not a NIC, so these numbers rank designs, they are not a score. Run-to-run noise on this machine is about ±10 %.
 
-| Users | Run | Result | CPU µs/req | CPU | p95 / p99 | cgroup peak |
-|---|---|---|---|---|---|---|
-| 160,000 | 60 s | PASS | 14.7-16.8 (before this round: 18.1-19.2; the JVM entry: 41-45) | 25-28 % | 8.8 / 20.1 ms | 693 MB |
-| 256,000 | 60 s | PASS | 14.4 (before: 17.8) | 39 % | 8.8 / 20.1 ms | 1,067 MB |
-| 384,000 | 60 s | PASS | 13.8 | 56 % | 9.8 / 20.9 ms | 1,568 MB |
-| 416,000 | 5-min hold | PASS, 0 errors | 14.3 | 63 % | 13.2 / 23.4 ms (before: 2.4 / 733 ms) | 1,771 MB |
-| 448,000 | 60 s | PASS | 14.0 | 66 % | 12.1 / 22.4 ms | 1,824 MB |
-| 448,000 | 5-min hold | FAIL (p99 1.27 s) | 14.9 | 70 % | 104 / 1,270 ms | 2,084 MB (the wall) |
-| 480,000 | 60 s | PASS | 15.1 | 77 % | 26 / 142 ms | 1,984 MB |
+| Users | Run | Result | CPU µs/req | CPU | p95 / p99 | RSS | cgroup peak |
+|---|---|---|---|---|---|---|---|
+| 160,000 | 60 s | PASS | 13.4 (A/B rounds: 12.5-13.3; b3 the same day 14.8-15.2; the JVM entry 41-45) | 23 % | 8.3 / 20.4 ms | 73 MB | 703 MB |
+| 256,000 | 60 s | PASS | 12.2 (b3: 14.0-16.0 the same day) | 33 % | 8.6 / 19.6 ms | 85 MB | 1,083 MB |
+| 416,000 | 5-min hold | PASS, 0 errors | 12.9 (b3: 14.3) | 57 % | 10.8 / 21.9 ms (reads p99 7 ms, writes 27 ms) | 133 MB | 1,816 MB |
+| 448,000 | 60 s | PASS | 12.1 | 58 % | 10.9 / 22.1 ms | 117 MB | 1,851 MB |
+| 480,000 | 60 s | PASS once, FAIL once (p99 946 / 1,106 ms) | 12.4-12.9 | 63-65 % | at the 2 GB wall | 118 MB | 1,997-2,002 MB |
 
-- Where it goes (perf, 160k): ~63 % kernel (TCP, io_uring), ~30 % SQLite's B-tree and pager, ~5 % Kotlin.
-- Earlier steps (160k users): SQL only 30-44 µs/req → B-tree reads 22-30; one read snapshot across passes ~−4 %.
-- The limit is memory, not CPU: ~4.1 KB of kernel socket memory per connection; a 5-minute hold at 448k reaches the
-  2 GB wall. Process RSS is 20 MB idle and ~60-100 MB under load.
-- Writes now stay at p99 ~40 ms at 416k (before, they were the p99 at 416k/448k: `POST` p95 ~1.6 s on a shared disk).
-- Build: a cold build (Kotlin/Native toolchain download included) peaks at ~560 MB anonymous memory inside a 1.5 GB
-  no-swap cgroup.
+- Where it goes (perf, 160k, tmpfs): kernel 8.5 µs/req (TCP send/recv and loopback delivery 7.1 of it), user
+  4.4 (B-tree reads + JSON ~2, Kotlin ~0.7). java-iouring-davidhsv on the same rig: kernel 8.8, user 5.6.
+- Earlier steps (160k users): SQL only 30-44 µs/req → B-tree reads 22-30 → b3's loop/commit tricks ~15 → this round
+  (commit on the reader, PGO) ~13.
+- The limit is memory, not CPU: ~4.1 KB of kernel socket memory per connection; 480k users reach the 2 GB wall.
+  Process RSS is 20 MB idle and ~70-130 MB under load.
+- Build: from a clean `build/` (SQLite and liburing downloaded again; the Kotlin/Native toolchain already in
+  `~/.konan`) on one core inside a 1.5 GB no-swap cgroup: 178 s including the ~8 s training run, cgroup peak 584 MB
+  (548 MB anonymous). The first build on a box also downloads the Kotlin/Native toolchain (~560 MB anonymous peak).
 
 ## Knobs (all optional; the defaults are what is scored)
 
 `KN_VFS` (base SQLite VFS, default `unix`), `KN_WALVFS=0` (stock WAL writes), `KN_PCACHE=0` (stock pcache1),
 `KN_BTREE=0` (SQL only), `KN_SNAPSHOT=0` (new read transaction every pass), `KN_WINDOW_US` / `KN_BATCH_MAX` (group
 commit, default 20000 / 1024), `KN_PACE_NR` / `KN_PACE_US` (batch wake, default 256 / 1000; `KN_PACE_NR=1` = off),
-`KN_DEFER=1` (`DEFER_TASKRUN` rings), `KN_MAX_EV` (events per pass, default 4096), `KN_LISTENERS` (1-8),
+`KN_DEFER=1` (`DEFER_TASKRUN` rings), `KN_PASS=sweep` (the davidhsv pass structure; `KN_PACE_ALWAYS`), `KN_COMMITTER=1`
+(commit on the committer thread always), `KN_SLOW_MS` / `KN_SLOW_CK_MS` / `KN_SLOW_MEM_PCT` / `KN_SLOW_HOLD_MS` (slow-disk
+guard, default 50 / 200 / 90 / 10000; `KN_SLOW_MEM_PCT=0` = no memory trigger), `KN_CACHE_KB` (reader page cache, default 65536), `KN_MAX_EV` (events per pass, default 4096), `KN_LISTENERS` (1-8),
 `KN_HDR=0` (the old two-pass head parser), `KN_MLOCK=0`, `KN_RINGS`, `KN_STATS=1` / `KN_PROF=1` / `KN_CKPT_LOG=1`
-(counters on stdout/stderr every 10 s), `KN_VERIFY=1` (the byte-for-byte check above).
+(counters on stdout/stderr every 10 s), `KN_STALLS=1` (log passes over 100 ms), `KN_VERIFY=1` (the byte-for-byte
+check above). Build: `KN_CPGO=0` (no profile), `KN_CFLAGS`, `KN_TRAIN_PORT` / `KN_TRAIN_REQS` / `KN_TRAIN_CONNS` /
+`KN_TRAIN_TIMEOUT`. Test only: `KN_TEST_WAL_DELAY_US` (sleep in every WAL write, for the slow-disk guard).
 
 Extra checks besides `test/run.sh`: `test-restart.sh` (a restart right after a stop with open connections comes up
 healthy; on Ubuntu's 6.8 kernel the old process's io_uring keeps its listener alive briefly after exit, so `bind()`
@@ -145,6 +186,11 @@ answered).
 - rust-iouring-rkkautsar: one read snapshot across passes.
 - swift-iouring-akbashev: checkpointer at nice 5 with a bounded hold.
 - zig-iouring-unorig-username (via the JVM entry): the two-step feed idea that led to the B-tree feed.
+- java-iouring-davidhsv: the sweep pass structure (`KN_PASS=sweep`: sweep the other rings without waiting, then
+  wait on ring 0 alone; the zero-timeout second enter) and the on-loop commit on the reading connection.
+- c-iouring-pavlyhalim: PGO trained during the build on its own synthetic database (the approach; our mkdb/train
+  are our own, from the Graal entry kotlin-graal-3x3xX3N0N).
+- Our own JVM port (kotlin-jvm-uring-3x3xX3N0N): the page-cache-reset finding behind committing on the reader.
 
 ## Licences of what the build fetches
 

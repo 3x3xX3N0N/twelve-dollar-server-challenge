@@ -161,7 +161,7 @@ class Server(private val jwt: Jwt) {
                 lastStats = kn_now_ns()
                 println("stats: open=${ur_stat(0)} rings=${ur_stat(3)} enobufs=${ur_stat(1)} rearms=${ur_stat(4)} sweeps=${ur_stat(5)} " +
                     "accept_err=${ur_stat(2)} btree=${db_stat(0)} sql=${db_stat(1)} snapshots=${db_stat(2)} parked=${db_stat(3)} walw=${db_stat(4)} walpw=${db_stat(5)} " +
-                    "commits loop=${db_stat(6)} thread=${db_stat(7)} busy=${db_stat(8)} slow=${db_stat(9)} ckslow=${db_stat(10)}" +
+                    "commits loop=${db_stat(6)} thread=${db_stat(7)} busy=${db_stat(8)} slow=${db_stat(9)} ckslow=${db_stat(10)} memslow=${db_stat(11)}" +
                     if (PROF) " | ms: poll+wait=${tPoll / 1000000} dbread=${tRead / 1000000} (${nReads} reads) " +
                         "batch=${tBatch / 1000000} loop=${tAll / 1000000} passes=$nPasses" else "")
                 for (r in 0 until 8) if (ur_stat(100 + r) < 0) break
