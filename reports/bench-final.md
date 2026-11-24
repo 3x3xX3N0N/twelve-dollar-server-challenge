@@ -2,7 +2,7 @@
 
 **Submit `kn-final` (branch `b5-native-final`, `submissions/kotlin-native-3x3xX3N0N`).** Among our builds it is the
 cheapest per request in every interleaved comparison: 13.1 µs/req at 160k users and 11.8 at 384k. That is 8-11 %
-below kn-b3, 15-23 % below jvm-uring, 17-26 % below graal-ce and 3.4× cheaper than our open PR #377 (nio-v3). It
+below kn-b3, 15 % below jvm-uring, 17-26 % below graal-ce and 3.4× cheaper than our open PR #377 (nio-v3). It
 passes 42/42 and held 384k users for 5 minutes with 0 errors. Its highest 60 s pass is 480k users (1 of 2 runs),
 where it hits the same 2 GB memory wall as kn-b3. On tmpfs it is level with the reference java-iouring-davidhsv
 (#393): 12.2 vs 12.9 µs/req at 160k, 11.7 vs 11.2 at 384k, one run each, inside the rig noise.
