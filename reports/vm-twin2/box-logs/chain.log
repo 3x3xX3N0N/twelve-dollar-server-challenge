@@ -1,0 +1,9 @@
+enp8s0 Combined: 4
+20:41:23 label=calib-nio-q4	vus=96000	pass=PASS	reqs=1137893	err%=0.000	p95=460.8	p99=692.2	hold_p95=501.8	hold_p99=626.7	hold_rps=10068	box_cpu%=97	steal%=0.0	softirq%=21	box_us/req=96.2	proc_us/req=91.2	proc_user_us/req=46.6	rss_mb=429	rss_peak_mb=430	cg_peak_mb=579	memavail_min_mb=837	slab_mb=486	tcp_alloc=96012	conntrack=none	max_open=96000	conn_failed=0	timeouts=0	gen_stalls=0	gen_cpu_s=68.07
+20:45:52 label=kn	vus=160000	pass=FAIL	reqs=1903815	err%=0.000	p95=150.5	p99=1204.2	hold_p95=158.7	hold_p99=2506.8	hold_rps=16870	box_cpu%=75	steal%=0.2	softirq%=30	box_us/req=44.4	proc_us/req=37.2	proc_user_us/req=11.5	rss_mb=95	rss_peak_mb=95	cg_peak_mb=381	
+20:50:19 label=dav	vus=160000	pass=PASS	reqs=1908775	err%=0.000	p95=60.2	p99=444.4	hold_p95=112.1	hold_p99=536.6	hold_rps=16878	box_cpu%=72	steal%=0.2	softirq%=28	box_us/req=42.9	proc_us/req=34.0	proc_user_us/req=11.7	rss_mb=224	rss_peak_mb=225	cg_peak_mb=535	
+20:54:47 label=dav	vus=176000	pass=PASS	reqs=2094344	err%=0.000	p95=342.0	p99=790.5	hold_p95=577.5	hold_p99=905.2	hold_rps=18480	box_cpu%=80	steal%=0.1	softirq%=32	box_us/req=43.2	proc_us/req=35.2	proc_user_us/req=11.7	rss_mb=264	rss_peak_mb=264	cg_peak_mb=569
+20:59:15 label=dav	vus=192000	pass=FAIL	reqs=2245920	err%=0.000	p95=1302.5	p99=3129.3	hold_p95=2342.9	hold_p99=3719.2	hold_rps=19729	box_cpu%=88	steal%=0.1	softirq%=37	box_us/req=44.5	proc_us/req=37.4	proc_user_us/req=10.8	rss_mb=429	rss_peak_mb=430	cg_peak_mb
+HIGHEST kn 
+HIGHEST dav 176000
+CHAIN-DONE

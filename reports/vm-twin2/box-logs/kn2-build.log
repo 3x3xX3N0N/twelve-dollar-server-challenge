@@ -1,0 +1,6 @@
+1
+kotlin-native-3x3xX3N0N install rc=0 5 s
+kotlin-native-3x3xX3N0N build rc=0 203 s; CPU time consumed: 3min 15.522s Memory peak: 840.0K 
+== PGO training done; building with the recorded profile
+kotlin-native-3x3xX3N0N test rc=0 199 s: passed=42 failed=0 
+BUILD-DONE

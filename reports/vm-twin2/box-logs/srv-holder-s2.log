@@ -1,0 +1,8 @@
+2026-11-24T19:25:16Z deleting old server d13c0e5c-3f84-4f1c-98c0-33e5570af8a9 -> 204
+2026-11-24T19:25:21Z new server d434b148-9f61-45d2-89d3-14ed4ab0cc31
+Running as unit: tdsc-vmtwin2-watchdog-s2.service; invocation ID: c9be0a6455bc4f44831b59789a2d6e65
+2026-11-24T19:25:21Z watchdog-s2 rc=0
+2026-11-24T19:26:32Z ready
+2026-11-24T22:13:34Z stop requested
+2026-11-24T22:13:34Z DELETE d434b148-9f61-45d2-89d3-14ed4ab0cc31 -> 204
+2026-11-24T22:13:34Z cleanup done

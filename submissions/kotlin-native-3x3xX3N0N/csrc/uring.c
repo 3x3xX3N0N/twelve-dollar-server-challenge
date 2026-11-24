@@ -12,7 +12,7 @@
  *   queue later output behind an in-flight send so the order on the wire is kept.
  * - Secondary rings signal one eventfd that ring 0 reads, so the thread sleeps in one io_uring_enter.
  * Ideas from public MIT entries (no code copied): rust-iouring-kensac (rings spilling past the fd cap, 512 accepts in
- * flight, soft RLIMIT raised to the hard one, bounded re-arm after ENOBUFS), c-iouring-pavlyhalim (provided buffers). */
+ * flight, soft RLIMIT raised to the hard one, re-arm after ENOBUFS (bounded per pass there; KN_REARM here)), c-iouring-pavlyhalim (provided buffers). */
 #include "liburing.h"
 #include "kn.h"
 #include <arpa/inet.h>

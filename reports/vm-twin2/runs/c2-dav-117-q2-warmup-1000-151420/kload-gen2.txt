@@ -1,0 +1,11 @@
+kload: 250 VUs -> http://10.79.0.8:80 | ramp 20s hold 20s ramp-down 30s | 4 threads | source IPs 10.79.0.120..10.79.0.120 (1)
+[   10s] vus     92  open     92 |      12 req/s  fail  0.00% | p95   4.8ms  p99    19ms | +    9 conn/s | in    0.4 Mbit/s  out   0.0 Mbit/s
+[   20s] vus    219  open    219 |      28 req/s  fail  0.00% | p95   6.4ms  p99   7.3ms | +   13 conn/s | in    0.6 Mbit/s  out   0.0 Mbit/s
+[   30s] vus    250  open    250 |      27 req/s  fail  0.00% | p95   6.9ms  p99   8.3ms | +    3 conn/s | in    0.5 Mbit/s  out   0.0 Mbit/s
+[   40s] vus    250  open    250 |      28 req/s  fail  0.00% | p95   6.8ms  p99   7.1ms | +    0 conn/s | in    0.5 Mbit/s  out   0.0 Mbit/s
+[   50s] vus    235  open    235 |      25 req/s  fail  0.00% | p95   6.8ms  p99   7.1ms | +    0 conn/s | in    0.4 Mbit/s  out   0.0 Mbit/s
+[   60s] vus    168  open    168 |      17 req/s  fail  0.00% | p95   6.5ms  p99   6.9ms | +    0 conn/s | in    0.2 Mbit/s  out   0.0 Mbit/s
+[   70s] vus     81  open     81 |       6 req/s  fail  0.00% | p95   6.6ms  p99   6.9ms | +    0 conn/s | in    0.1 Mbit/s  out   0.0 Mbit/s
+[   80s] vus     18  open     18 |       0 req/s  fail  0.00% | p95   1.3ms  p99   1.3ms | +    0 conn/s | in    0.0 Mbit/s  out   0.0 Mbit/s
+Exception in thread "main" java.util.NoSuchElementException: Collection contains no element matching the predicate.
+	at kload.MainKt.main(Main.kt:148)

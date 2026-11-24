@@ -1,0 +1,65 @@
+== box
+Linux twin-server-s2 6.8.0-149-generic #149-Ubuntu SMP PREEMPT_DYNAMIC Fri Oct 23 13:21:10 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+model name	: Intel Xeon Processor (Cascadelake)
+1
+MemTotal:        2009040 kB
+SwapTotal:       5017596 kB
+ Automatic IBRS; IBPB: conditional; PBRSB-eIBRS: SW sequence; BHI: SW loop, KVM: SW loop
+return thunks
+itlb_multihit:KVM: Mitigation: VMX unsupported
+vmscape:Not affected
+mmio_stale_data:Vulnerable: Clear CPU buffers attempted, no microcode; SMT Host state unknown
+mds:Not affected
+reg_file_data_sampling:Not affected
+tsa:Not affected
+l1tf:Not affected
+spec_store_bypass:Mitigation: Speculative Store Bypass disabled via prctl
+tsx_async_abort:Not affected
+swapgs barriers and __user pointer sanitization
+gather_data_sampling:Unknown: Dependent on hypervisor status
+retbleed:Mitigation: Enhanced IBRS
+spec_rstack_overflow:Not affected
+srbds:Not affected
+meltdown:Not affected
+BOOT_IMAGE=/boot/vmlinuz-6.8.0-149-generic root=UUID=1d9bf0e6-c105-4e50-9349-ae257213333a ro quiet vultr consoleblank=0 mpt3sas.max_queue_depth=1000 ds=vultr console=ttyS1,115200n8 console=tty0
+Ubuntu 24.04.5 LTS
+microsoft
+/dev/vda2        47G  8.3G   36G  19% /
+NAME ROTA  SIZE MODEL
+sr0     1 1024M QEMU DVD-ROM
+vda     1   50G 
+== wait cloud-init
+status: done
+== swap
+NAME      TYPE SIZE USED PRIO
+/swapfile file 4.8G   0B   -2
+SwapTotal:             0 kB
+== firewall
+Status: active
+Firewall stopped and disabled on system startup
+== apt timers
+Removed "/etc/systemd/system/timers.target.wants/apt-daily-upgrade.timer".
+Removed "/etc/systemd/system/timers.target.wants/apt-daily.timer".
+
+Running kernel seems to be up-to-date.
+
+Restarting services...
+ systemctl restart fwupd.service packagekit.service
+
+No containers need to be restarted.
+
+No user sessions are running outdated binaries.
+
+No VM guests are running outdated hypervisor (qemu) binaries on this host.
+v18.19.1
+3.45.1 2024-01-30 16
+vpc if: enp8s0
+== sysctl as shipped
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 128
+net.ipv4.tcp_mem = 21768	29027	43536
+fs.nr_open = 1048576
+net.ipv4.ip_local_port_range = 32768	60999
+kernel.io_uring_disabled = 0
+PREP-DONE
+6.8.0-149-generic swap=0 ct=0

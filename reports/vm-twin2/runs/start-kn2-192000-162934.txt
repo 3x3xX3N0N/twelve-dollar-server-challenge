@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 90d36d8433754a849f78baddeee298d8
+healthy after .142395893 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 0: used=64947 accepts=0 cqes=2049782 accepted=66281 sq_ready=3 cq_ready=7 flags=0
+  ring 1: used=43351 accepts=0 cqes=1590353 accepted=65279 sq_ready=0 cq_ready=5 flags=0
+  ring 2: used=7749 accepts=512 cqes=883734 accepted=45444 sq_ready=0 cq_ready=0 flags=0
+stats: open=57398 rings=3 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1938916 sql=0 snapshots=5979 parked=4836 walw=527885 walpw=13174 commits loop=5993 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ends: recv_eof=119606 shuts=2 send_zero=0
+  ring 0: used=46268 accepts=0 cqes=2187325 accepted=66281 sq_ready=7 cq_ready=10 flags=0
+  ring 1: used=11047 accepts=0 cqes=1662585 accepted=65279 sq_ready=2 cq_ready=7 flags=0
+  ring 2: used=83 accepts=512 cqes=899066 accepted=45444 sq_ready=0 cq_ready=0 flags=0
+stats: open=503 rings=3 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1942350 sql=0 snapshots=6193 parked=4912 walw=536069 walpw=13659 commits loop=6313 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ends: recv_eof=176501 shuts=2 send_zero=0
+  ring 0: used=405 accepts=0 cqes=2292984 accepted=66281 sq_ready=4096 cq_ready=405 flags=0
+  ring 1: used=98 accepts=0 cqes=1684479 accepted=65279 sq_ready=0 cq_ready=104 flags=0
+  ring 2: used=0 accepts=512 cqes=899232 accepted=45444 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 1min 27.452s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795555777.833884608 cpu_user=89691 cpu_nice=269 cpu_sys=61003 cpu_idle=33022 cpu_iowait=303506 cpu_irq=0 cpu_softirq=62530 cpu_steal=740 cg_usage_usec=31301 cg_user_usec=10433 cg_system_usec=20867 cg_core_sched.force_idle_usec=0 cg_mem=17981440 cg_peak=18759680 cgm_anon=15147008 cgm_file=32768 cgm_kernel=2801664 cgm_sock=0 cgm_slab=1309808 rss_kb=20372 nprocs=1 mi_MemTotal=2009056 mi_MemFree=741112 mi_MemAvailable=1672416 mi_Cached=996272 mi_AnonPages=68020 mi_Slab=91136 tcp_inuse=5 tcp_orphan=0 tcp_tw=2 tcp_alloc=6 tcp_mem_pages=79 io_some=80.00 conntrack=none load=0.75 softnet_drop=0 squeeze=4334 enp1s0_rxdrop=0 enp1s0_rxp=4103250 enp1s0_txp=3116954 enp8s0_rxdrop=0 enp8s0_rxp=64464392 enp8s0_txp=43443898 TcpEstabResets=299816 TcpRetransSegs=2726360 TcpOutRsts=3816143 TcpExtSyncookiesSent=0 TcpExtPruneCalled=741816 TcpExtRcvPruned=0 TcpExtListenOverflows=18604 TcpExtListenDrops=18604 TcpExtTCPTimeouts=2337542 TcpExtTCPLossProbes=583195 TcpExtTCPAbortOnData=115 TcpExtTCPAbortOnClose=85764 TcpExtTCPAbortOnMemory=0 TcpExtTCPAbortOnTimeout=184701 TcpExtTCPMemoryPressures=7 TcpExtTCPBacklogDrop=0 TcpExtTCPReqQFullDoCookies=0 TcpExtTCPReqQFullDrop=0 TcpExtTCPOFODrop=1 TcpExtTCPToZeroWindowAdv=0 TcpExtTCPWantZeroWindowAdv=0 TcpExtTCPOrigDataSent=54681158 TcpExtTCPZeroWindowDrop=2 TcpExtTCPRcvQDrop=0

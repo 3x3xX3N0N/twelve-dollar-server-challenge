@@ -1,0 +1,1 @@
+gens=[1 2 3 4] net=vpc nsrc=1 per_gen=250 ramp=20 hold=20 knenv=[KN_STATS=1 KN_NBUF=4096]

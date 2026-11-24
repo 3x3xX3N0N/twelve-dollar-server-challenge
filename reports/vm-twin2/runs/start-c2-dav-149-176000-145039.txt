@@ -1,0 +1,15 @@
+Running as unit: srv.service; invocation ID: a56bbec252fc420ab51d8025f9ec2bef
+healthy after 1.011642678 s: {"status":"ok","db":"ok","uptime_s":0}
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 2 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+srv.service: Consumed 2min 21.666s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795549844.391309564 cpu_user=93651 cpu_nice=99 cpu_sys=11365 cpu_idle=20070 cpu_iowait=1535 cpu_irq=0 cpu_softirq=2893 cpu_steal=31 cg_usage_usec=1013011 cg_user_usec=902174 cg_system_usec=110836 cg_core_sched.force_idle_usec=0 cg_mem=100392960 cg_peak=100642816 cgm_anon=55771136 cgm_file=40165376 cgm_kernel=4456448 cgm_sock=0 cgm_slab=1531232 rss_kb=81648 nprocs=1 mi_MemTotal=2009040 mi_MemFree=563664 mi_MemAvailable=1605724 mi_Cached=1092488 mi_AnonPages=106648 mi_Slab=160120 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=97 io_some=12.36 conntrack=none load=0.66 softnet_drop=0 squeeze=10 enp1s0_rxdrop=0 enp1s0_rxp=47818 enp1s0_txp=30178 enp8s0_rxdrop=0 enp8s0_rxp=2724948 enp8s0_txp=1925308 TcpEstabResets=0 TcpRetransSegs=31984 TcpOutRsts=475 TcpExtSyncookiesSent=0 TcpExtPruneCalled=5 TcpExtRcvPruned=0 TcpExtListenOverflows=0 TcpExtListenDrops=0 TcpExtTCPTimeouts=293 TcpExtTCPLossProbes=31455 TcpExtTCPAbortOnData=17 TcpExtTCPAbortOnClose=0 TcpExtTCPAbortOnMemory=0 TcpExtTCPAbortOnTimeout=0 TcpExtTCPMemoryPressures=0 TcpExtTCPBacklogDrop=0 TcpExtTCPReqQFullDoCookies=0 TcpExtTCPReqQFullDrop=0 TcpExtTCPOFODrop=0 TcpExtTCPToZeroWindowAdv=639 TcpExtTCPWantZeroWindowAdv=1983 TcpExtTCPOrigDataSent=3299650 TcpExtTCPZeroWindowDrop=0 TcpExtTCPRcvQDrop=0

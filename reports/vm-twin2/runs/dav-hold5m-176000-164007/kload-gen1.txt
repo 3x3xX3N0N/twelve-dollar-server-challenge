@@ -1,0 +1,58 @@
+kload: 44000 VUs -> http://10.79.0.8:80 | ramp 1m hold 5m ramp-down 30s | 4 threads | source IPs 10.79.0.110..10.79.0.110 (1)
+[   10s] vus   5409  open   5409 |     722 req/s  fail  0.00% | p95   3.0ms  p99   5.9ms | +  541 conn/s | in   15.9 Mbit/s  out   0.4 Mbit/s
+[   20s] vus  12774  open  12773 |    1581 req/s  fail  0.00% | p95   4.8ms  p99   8.6ms | +  736 conn/s | in   23.9 Mbit/s  out   1.1 Mbit/s
+[   30s] vus  20117  open  20117 |    2282 req/s  fail  0.00% | p95   7.0ms  p99    13ms | +  734 conn/s | in   38.0 Mbit/s  out   1.5 Mbit/s
+[   40s] vus  27448  open  27448 |    3132 req/s  fail  0.00% | p95    22ms  p99    59ms | +  733 conn/s | in   47.9 Mbit/s  out   2.2 Mbit/s
+[   50s] vus  34790  open  34790 |    3839 req/s  fail  0.00% | p95    17ms  p99    45ms | +  734 conn/s | in   60.2 Mbit/s  out   2.7 Mbit/s
+[   60s] vus  42121  open  42118 |    4661 req/s  fail  0.00% | p95    28ms  p99    59ms | +  733 conn/s | in   71.0 Mbit/s  out   3.3 Mbit/s
+[   70s] vus  44000  open  44000 |    4387 req/s  fail  0.00% | p95  1942ms  p99  2703ms | +  188 conn/s | in   65.6 Mbit/s  out   3.2 Mbit/s
+[   80s] vus  44000  open  44000 |    4616 req/s  fail  0.00% | p95   140ms  p99   196ms | +    0 conn/s | in   64.5 Mbit/s  out   3.4 Mbit/s
+[   90s] vus  44000  open  44000 |    4609 req/s  fail  0.00% | p95    21ms  p99    40ms | +    0 conn/s | in   69.5 Mbit/s  out   3.3 Mbit/s
+[  100s] vus  44000  open  44000 |    4712 req/s  fail  0.00% | p95    23ms  p99    54ms | +    0 conn/s | in   67.9 Mbit/s  out   3.4 Mbit/s
+[  110s] vus  44000  open  44000 |    4602 req/s  fail  0.00% | p95    50ms  p99   144ms | +    0 conn/s | in   68.4 Mbit/s  out   3.4 Mbit/s
+[  120s] vus  44000  open  44000 |    4684 req/s  fail  0.00% | p95    28ms  p99    72ms | +    0 conn/s | in   68.5 Mbit/s  out   3.4 Mbit/s
+[  130s] vus  44000  open  44000 |    4635 req/s  fail  0.00% | p95    51ms  p99   119ms | +    0 conn/s | in   68.2 Mbit/s  out   3.4 Mbit/s
+[  140s] vus  44000  open  44000 |    4659 req/s  fail  0.00% | p95    27ms  p99    39ms | +    0 conn/s | in   68.5 Mbit/s  out   3.4 Mbit/s
+[  150s] vus  44000  open  44000 |    4653 req/s  fail  0.00% | p95    15ms  p99    29ms | +    0 conn/s | in   68.2 Mbit/s  out   3.4 Mbit/s
+[  160s] vus  44000  open  44000 |    4672 req/s  fail  0.00% | p95    26ms  p99   112ms | +    0 conn/s | in   68.6 Mbit/s  out   3.4 Mbit/s
+[  170s] vus  44000  open  44000 |    4650 req/s  fail  0.00% | p95    32ms  p99   116ms | +    0 conn/s | in   68.1 Mbit/s  out   3.4 Mbit/s
+[  180s] vus  44000  open  44000 |    4646 req/s  fail  0.00% | p95    83ms  p99   134ms | +    0 conn/s | in   68.0 Mbit/s  out   3.4 Mbit/s
+[  190s] vus  44000  open  44000 |    4681 req/s  fail  0.00% | p95    56ms  p99   121ms | +    0 conn/s | in   68.8 Mbit/s  out   3.4 Mbit/s
+[  200s] vus  44000  open  44000 |    4589 req/s  fail  0.00% | p95    18ms  p99    76ms | +    0 conn/s | in   67.5 Mbit/s  out   3.4 Mbit/s
+[  210s] vus  44000  open  44000 |    4695 req/s  fail  0.00% | p95    35ms  p99    96ms | +    0 conn/s | in   69.0 Mbit/s  out   3.4 Mbit/s
+[  220s] vus  44000  open  44000 |    4664 req/s  fail  0.00% | p95    97ms  p99   177ms | +    0 conn/s | in   68.5 Mbit/s  out   3.4 Mbit/s
+[  230s] vus  44000  open  44000 |    4659 req/s  fail  0.00% | p95    18ms  p99    72ms | +    0 conn/s | in   68.6 Mbit/s  out   3.4 Mbit/s
+[  240s] vus  44000  open  44000 |    4680 req/s  fail  0.00% | p95    31ms  p99    78ms | +    0 conn/s | in   68.4 Mbit/s  out   3.4 Mbit/s
+[  250s] vus  44000  open  44000 |    4625 req/s  fail  0.00% | p95    34ms  p99    67ms | +    0 conn/s | in   68.5 Mbit/s  out   3.4 Mbit/s
+[  260s] vus  44000  open  44000 |    4660 req/s  fail  0.00% | p95    49ms  p99    99ms | +    0 conn/s | in   68.5 Mbit/s  out   3.4 Mbit/s
+[  270s] vus  44000  open  44000 |    4661 req/s  fail  0.00% | p95    14ms  p99    29ms | +    0 conn/s | in   68.9 Mbit/s  out   3.4 Mbit/s
+[  280s] vus  44000  open  44000 |    4643 req/s  fail  0.00% | p95    26ms  p99    57ms | +    0 conn/s | in   68.3 Mbit/s  out   3.4 Mbit/s
+[  290s] vus  44000  open  44000 |    4665 req/s  fail  0.00% | p95    17ms  p99    31ms | +    0 conn/s | in   68.9 Mbit/s  out   3.4 Mbit/s
+[  300s] vus  44000  open  44000 |    4629 req/s  fail  0.00% | p95    31ms  p99    69ms | +    0 conn/s | in   68.3 Mbit/s  out   3.4 Mbit/s
+[  310s] vus  44000  open  44000 |    4655 req/s  fail  0.00% | p95    63ms  p99   134ms | +    0 conn/s | in   69.2 Mbit/s  out   3.4 Mbit/s
+[  320s] vus  44000  open  44000 |    4676 req/s  fail  0.00% | p95    18ms  p99    39ms | +    0 conn/s | in   68.2 Mbit/s  out   3.4 Mbit/s
+[  330s] vus  44000  open  44000 |    4622 req/s  fail  0.00% | p95    19ms  p99    54ms | +    0 conn/s | in   69.0 Mbit/s  out   3.4 Mbit/s
+[  340s] vus  44000  open  44000 |    4684 req/s  fail  0.00% | p95   132ms  p99   189ms | +    0 conn/s | in   68.7 Mbit/s  out   3.4 Mbit/s
+[  350s] vus  44000  open  44000 |    4623 req/s  fail  0.00% | p95    25ms  p99    36ms | +    0 conn/s | in   68.3 Mbit/s  out   3.4 Mbit/s
+[  360s] vus  44000  open  44000 |    4651 req/s  fail  0.00% | p95    28ms  p99    72ms | +    0 conn/s | in   69.1 Mbit/s  out   3.4 Mbit/s
+[  370s] vus  40508  open  40508 |    4118 req/s  fail  0.00% | p95   692ms  p99   823ms | +    0 conn/s | in   57.9 Mbit/s  out   3.1 Mbit/s
+[  380s] vus  29477  open  29477 |    2820 req/s  fail  0.00% | p95    33ms  p99    66ms | +    0 conn/s | in   34.3 Mbit/s  out   2.2 Mbit/s
+[  390s] vus  14669  open  14670 |    1234 req/s  fail  0.00% | p95   7.3ms  p99   9.9ms | +    0 conn/s | in   12.2 Mbit/s  out   1.1 Mbit/s
+[  400s] vus   3647  open   3647 |     148 req/s  fail  0.00% | p95    82ms  p99   346ms | +    0 conn/s | in    0.3 Mbit/s  out   0.2 Mbit/s
+
+  http_req_duration (whole run, as k6 thresholds see it)
+    avg 33ms  med 4.6ms  p90 24ms  p95 72ms  p99 913ms  max 3569ms
+  requests      1638609 (4096/s)   failed 0 (0.000%)   iterations 732610
+  hold window   1392921 reqs (4643/s)   failed 0.000%   p95 60ms  p99 1020ms
+  by endpoint
+    GET /feed                 755305  failed       0  p95     67ms  p99    799ms  max   3569ms
+    GET /posts/:id            755305  failed       0  p95     72ms  p99    938ms  max   2616ms
+    POST /posts/:id/like      112956  failed       0  p95     99ms  p99   1319ms  max   3252ms
+    POST /posts                15043  failed       0  p95     92ms  p99   1237ms  max   3205ms
+  connections   44000 attempts (110/s)   failed 0 (bind/port 0)   timeouts 0   keep-alive retries 0   max open 44000
+  connect time  med 0.3ms  p99 1.3ms  max 58ms   (not part of http_req_duration, same as k6)
+  network       in 3013.8 MB (60.3 Mbit/s avg)   out 149.1 MB (3.0 Mbit/s avg)
+  generator     4 threads   cpu 65s (16% of one core)   rss 427 MB (peak 427 MB, 9.9 KB/VU)
+  self-check    longest event-loop pass 7.4ms, passes over 100ms: 0 (latency is the server's, not kload's)
+
+  thresholds    p(95)<500ms ✓ 72ms   p(99)<1000ms ✓ 913ms   http_req_failed<1% ✓ 0.000%   =>  PASS

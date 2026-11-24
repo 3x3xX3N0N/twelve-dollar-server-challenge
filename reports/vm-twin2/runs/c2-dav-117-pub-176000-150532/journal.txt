@@ -1,0 +1,10 @@
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: srv.service: Main process exited, code=exited, status=143/n/a
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: srv.service: Failed with result 'exit-code'.
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: srv.service: Consumed 1min 15.629s CPU time.
+2026-11-24T20:03:31+00:00 twin-server-s2 systemd[1]: Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+2026-11-24T20:03:32+00:00 twin-server-s2 bash[5442]: WARNING: Using incubator modules: jdk.incubator.vector
+2026-11-24T20:03:32+00:00 twin-server-s2 bash[5442]: listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+2026-11-24T20:05:59+00:00 twin-server-s2 bash[5442]: ring 1 added
+2026-11-24T20:06:21+00:00 twin-server-s2 bash[5442]: ring 2 added

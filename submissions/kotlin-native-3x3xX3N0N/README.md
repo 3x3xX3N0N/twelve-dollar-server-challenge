@@ -157,28 +157,34 @@ not a NIC, so these numbers rank designs, they are not a score. Run-to-run noise
 
 ## Measured on a twin of the scored box (VM, not a score)
 
-Vultr `vhp-1c-2gb-intel` (Cascade Lake, 1 vCPU, 1,962 MiB, Ubuntu 24.04, stock kernel 6.8.0-149, no swap, no ufw),
-load from an 8-vCPU VM in the same datacenter over a private network. Each run on a fresh start and a fresh seed copy;
-`load.js`'s user model and thresholds (kload), 60 s ramp. Calibration: the JVM entry kotlin-nio-3x3xX3N0N costs
-76-81 µs/req there (79 official), so per-request CPU carries over. The top end does not: java-iouring-davidhsv, which
-holds 240,000 officially, also fails 176,000 on this twin, so read these as a lower bound.
+Vultr `vhp-1c-2gb-intel` (Cascade Lake, 1 vCPU, 1,961 MiB, Ubuntu 24.04, kernel 6.8.0-117 as on the scored box, no
+swap, no ufw, no sysctl changed), load from four 4-vCPU VMs in the same datacenter, one source IP each, over a
+private network. Each run on a fresh start and a fresh seed copy; `load.js`'s user model and thresholds (kload,
+histograms merged across the four generators), 60 s ramp.
 
-| Users | Run | Result | CPU µs/req (process / box) | p95 / p99 | RSS |
-|---|---|---|---|---|---|
-| 96,000-160,000 | 60 s steps | PASS (all five) | 26.3 → 22.0 / 32.1 → 28.9 | 9.9 / 21.4 → 33.0 / 169 ms | 66-78 MB |
-| 144,000 | 5-min hold | PASS, 0 errors | 25.0 / 31.8 | 24.7 / 57.1 ms | 101 MB |
-| 160,000 | 5-min hold | FAIL (java-iouring-davidhsv too) | | | |
-| 176,000 | 60 s step ×2 | FAIL (java-iouring-davidhsv too) | | | |
+- **Calibration.** With the VM's stock single NIC queue the host drops packets above ~30k packets/s. Every entry
+  then collapses at ~160-176k with mass retransmit timeouts, which the scorer never shows. With 4 NIC queues
+  (`ethtool -L … combined 4`) that loss is gone, and java-iouring-davidhsv fails at the top the way it fails on the
+  scorer (on p99, 0 errors). Its ceiling is still lower on this VM: a 176,000 hold (p99 913 ms) against 240,000
+  officially (p99 961 ms). The JVM entry kotlin-nio-3x3xX3N0N costs 91 µs/req here against its official 79. So
+  compare the two entries with each other, not the users with the leaderboard.
 
-java-iouring-davidhsv on the same twin: 20.2-24.3 µs/req process, 28.2-36.1 box; 144,000 hold PASS at 24.4 / 32.2,
-p95 / p99 20.6 / 36.1 ms, RSS 209 MB. On this box the two cost the same per request box-wide.
-- The wall is the 60 s ramp. Around 150k connections the ramp pushes the CPU to 100 %, TCP memory passes `tcp_mem`
-  (170 MB on a 2 GB box), and the kernel aborts connections (`ETIMEDOUT` on the receive, ~45k per spike). On 6.8,
-  closing a direct descriptor is not released while older multishot receives are in flight: the aborted sockets stay
-  allocated, the clients reconnect after their 60 s timeout, and memory climbs (an OOM in the 160k hold). As far as
-  I can tell, kernels 6.13+ free each file on its own.
-- The slow-disk guard never fired in a passing run (0 slow commits; every commit on the loop).
-- Build on the box (1 vCPU): `install.sh` 12 s, `build.sh` 184-201 s including the PGO training run, `test/run.sh` 42/42.
+| Users | Run | This entry | java-iouring-davidhsv |
+|---|---|---|---|
+| 160,000 | 60 s step | PASS, p99 363 ms, 42.9 µs/req box | PASS, p99 444 ms, 42.9 |
+| 176,000 | 60 s step | PASS, p99 346 ms, 42.5 | PASS, p99 791 ms, 43.2 |
+| 176,000 | 5-min hold | **PASS**, 0 errors, p95 / p99 42 / 281 ms, 41.6 µs/req box (36.0 process), RSS 146 MB | **PASS**, 0 errors, 71 / 913 ms, 42.5 (35.6), 343 MB |
+| 184,000 | 60 s step | FAIL on p99 (1.16 s), 0 errors | FAIL on p99 (1.43 s), 0 errors |
+| 192,000 | 60 s step | FAIL on p99 (2.7 s), 0 errors | FAIL on p99 (3.1 s), 0 errors |
+
+- On this VM the two cost the same per request box-wide. This entry's tail latency is lower at every load.
+- Before the buffer change (1,024 provided buffers per ring, at most 256 re-arms per pass), this entry failed the
+  160,000 step on p99 1.2 s and passed 144,000 (step and 5-min hold, p99 100 ms). A burst of `ENOBUFS` at the end
+  of the ramp and at the start of the ramp-down left thousands of receives waiting for seconds.
+- The slow-disk guard fired once in the 176,000 hold (a 57 ms commit as the ramp-down began; 441 commits went to the
+  thread for 10 s, then back to the loop) and never in the 60 s steps.
+- Build on the box (1 vCPU): `install.sh` 5-17 s, `build.sh` 203-240 s including the PGO training run,
+  `test/run.sh` 42/42.
 
 ## Knobs (all optional; the defaults are what is scored)
 
@@ -203,7 +209,8 @@ answered).
 ## Credits (ideas only; no files or code copied; all MIT)
 
 - rust-iouring-kensac: rings spilling past the fd cap, 512 accepts in flight, soft `RLIMIT_NOFILE` raised to hard,
-  bounded re-arm after `ENOBUFS`, the buffer-ring registration quirk, B-tree cursor reads with schema checks at start.
+  re-arm after `ENOBUFS` (bounded per pass there; the `KN_REARM` knob here), the buffer-ring registration quirk,
+  B-tree cursor reads with schema checks at start.
 - c-iouring-pavlyhalim: provided-buffer receive, B-tree read helpers as a pattern.
 - kotlin-trikeshed-jnorthrup: Kotlin/Native + SQLite amalgamation built on the box; the head parsed as a struct
   (first character, then verify at fixed offsets); batch wake (256 completions or 1 ms).

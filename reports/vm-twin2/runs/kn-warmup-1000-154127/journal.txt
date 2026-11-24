@@ -1,0 +1,24 @@
+2026-11-24T20:41:35+00:00 twin-server-s2 bash[30452]: stats: open=192 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=197 sql=0 snapshots=1 parked=0 walw=0 walpw=0 commits loop=0 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:41:35+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=2 shuts=0 send_zero=0
+2026-11-24T20:41:35+00:00 twin-server-s2 bash[30452]:   ring 0: used=192 accepts=512 cqes=595 accepted=194 sq_ready=1 cq_ready=0 flags=0
+2026-11-24T20:41:45+00:00 twin-server-s2 bash[30452]: stats: open=695 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1142 sql=0 snapshots=29 parked=2 walw=110 walpw=20 commits loop=28 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:41:45+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=2 shuts=0 send_zero=0
+2026-11-24T20:41:45+00:00 twin-server-s2 bash[30452]:   ring 0: used=695 accepts=512 cqes=3068 accepted=697 sq_ready=0 cq_ready=0 flags=0
+2026-11-24T20:41:55+00:00 twin-server-s2 bash[30452]: stats: open=1000 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=2144 sql=0 snapshots=91 parked=4 walw=376 walpw=67 commits loop=90 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:41:55+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=3 shuts=0 send_zero=0
+2026-11-24T20:41:55+00:00 twin-server-s2 bash[30452]:   ring 0: used=1000 accepts=512 cqes=5564 accepted=1003 sq_ready=1 cq_ready=0 flags=0
+2026-11-24T20:42:05+00:00 twin-server-s2 bash[30452]: stats: open=1000 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=3101 sql=0 snapshots=146 parked=8 walw=800 walpw=161 commits loop=149 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:42:05+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=3 shuts=0 send_zero=0
+2026-11-24T20:42:05+00:00 twin-server-s2 bash[30452]:   ring 0: used=1000 accepts=512 cqes=7624 accepted=1003 sq_ready=1 cq_ready=0 flags=0
+2026-11-24T20:42:15+00:00 twin-server-s2 bash[30452]: stats: open=937 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=4031 sql=0 snapshots=232 parked=10 walw=1460 walpw=306 commits loop=238 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:42:15+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=66 shuts=0 send_zero=0
+2026-11-24T20:42:15+00:00 twin-server-s2 bash[30452]:   ring 0: used=937 accepts=512 cqes=9822 accepted=1003 sq_ready=1 cq_ready=1 flags=0
+2026-11-24T20:42:25+00:00 twin-server-s2 bash[30452]: stats: open=799 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=4810 sql=0 snapshots=292 parked=12 walw=1933 walpw=425 commits loop=303 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:42:25+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=204 shuts=0 send_zero=0
+2026-11-24T20:42:25+00:00 twin-server-s2 bash[30452]:   ring 0: used=799 accepts=512 cqes=11801 accepted=1003 sq_ready=0 cq_ready=0 flags=0
+2026-11-24T20:42:35+00:00 twin-server-s2 bash[30452]: stats: open=482 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=5130 sql=0 snapshots=335 parked=14 walw=2279 walpw=513 commits loop=349 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:42:35+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=521 shuts=0 send_zero=0
+2026-11-24T20:42:35+00:00 twin-server-s2 bash[30452]:   ring 0: used=482 accepts=512 cqes=13175 accepted=1003 sq_ready=0 cq_ready=0 flags=0
+2026-11-24T20:42:45+00:00 twin-server-s2 bash[30452]: stats: open=142 rings=1 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=5218 sql=0 snapshots=345 parked=14 walw=2377 walpw=541 commits loop=363 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+2026-11-24T20:42:45+00:00 twin-server-s2 bash[30452]:   ends: recv_eof=861 shuts=0 send_zero=0
+2026-11-24T20:42:45+00:00 twin-server-s2 bash[30452]:   ring 0: used=142 accepts=512 cqes=14058 accepted=1003 sq_ready=1 cq_ready=0 flags=0

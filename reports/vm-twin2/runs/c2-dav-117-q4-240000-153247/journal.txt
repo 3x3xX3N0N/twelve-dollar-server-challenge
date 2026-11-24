@@ -1,0 +1,6 @@
+2026-11-24T20:33:07+00:00 twin-server-s2 bash[22654]: ring 1 added
+2026-11-24T20:33:24+00:00 twin-server-s2 bash[22654]: ring 2 added
+2026-11-24T20:33:50+00:00 twin-server-s2 systemd[1]: srv.service: A process of this unit has been killed by the OOM killer.
+2026-11-24T20:33:51+00:00 twin-server-s2 systemd[1]: srv.service: Main process exited, code=killed, status=9/KILL
+2026-11-24T20:33:51+00:00 twin-server-s2 systemd[1]: srv.service: Failed with result 'oom-kill'.
+2026-11-24T20:33:51+00:00 twin-server-s2 systemd[1]: srv.service: Consumed 41.176s CPU time.

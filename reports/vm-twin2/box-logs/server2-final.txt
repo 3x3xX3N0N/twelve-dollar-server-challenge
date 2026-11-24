@@ -1,0 +1,18 @@
+Linux twin-server-s2 6.8.0-117-generic #117-Ubuntu SMP PREEMPT_DYNAMIC Tue May  5 19:26:24 UTC 2026 x86_64 x86_64 x86_64 GNU/Linux
+Current hardware settings:
+RX:		n/a
+TX:		n/a
+Other:		n/a
+Combined:	4
+net.ipv4.tcp_mem = 22038	29386	44076
+net.core.somaxconn = 4096
+net.ipv4.tcp_max_syn_backlog = 128
+net.ipv4.tcp_max_orphans = 8192
+[Tue Nov 24 19:57:02 2026] TCP: Hash tables configured (established 16384 bind 16384)
+[Tue Nov 24 20:33:50 2026] server invoked oom-killer: gfp_mask=0xcc0(GFP_KERNEL), order=0, oom_score_adj=0
+[Tue Nov 24 20:33:50 2026]  oom_kill_process+0x118/0x280
+[Tue Nov 24 20:33:50 2026]  ? oom_evaluate_task+0x143/0x1e0
+[Tue Nov 24 20:33:50 2026]  __alloc_pages_may_oom+0x10c/0x1d0
+[Tue Nov 24 20:33:50 2026] [  pid  ]   uid  tgid total_vm      rss rss_anon rss_file rss_shmem pgtables_bytes swapents oom_score_adj name
+[Tue Nov 24 20:33:50 2026] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/system.slice/srv.service,task=server,pid=22654,uid=1001
+[Tue Nov 24 20:33:50 2026] Out of memory: Killed process 22654 (server) total-vm:1279504kB, anon-rss:364996kB, file-rss:7552kB, shmem-rss:0kB, UID:1001 pgtables:1032kB oom_score_adj:0

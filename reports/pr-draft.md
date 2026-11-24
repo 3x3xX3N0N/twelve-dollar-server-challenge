@@ -1,6 +1,6 @@
-# PR draft (NOT opened). The owner opens it after reading reports/vm-twin.md
+# PR draft (NOT opened). The owner opens it after reading reports/vm-twin2.md
 
-Head: branch `vm-twin` (on top of `b5-native-final`), folder `submissions/kotlin-native-3x3xX3N0N/` only.
+Head: branch `vm-twin2` (on top of `vm-twin` / `b5-native-final`), folder `submissions/kotlin-native-3x3xX3N0N/` only.
 Open question for the owner: open this as a new entry (it does not touch `kotlin-nio-3x3xX3N0N` or #377).
 
 ---
@@ -13,16 +13,17 @@ Adds `submissions/kotlin-native-3x3xX3N0N/`: the handlers of kotlin-nio-3x3xX3N0
 instead of the JVM, on one thread over io_uring, with SQLite compiled in. Direct on `HOST:PORT`, no Nginx. Nothing
 outside the folder is touched.
 
-- **Passes 42/42**: locally on kernel 7.0, and on a stock Ubuntu 24.04 VM (1 vCPU / 2 GB, kernel 6.8.0-149) built
-  from scratch with `install.sh` as root (12 s) and `build.sh` as a normal user (184-201 s on the one vCPU,
-  profile training included).
+- **Passes 42/42**: locally on kernel 7.0, and on stock Ubuntu 24.04 VMs (1 vCPU / 2 GB, kernels 6.8.0-149 and
+  6.8.0-117) built from scratch with `install.sh` as root (5-17 s) and `build.sh` as a normal user (184-240 s on
+  the one vCPU, profile training included).
 - **What is Kotlin and what is C:** the event loop, connection table, HTTP parsing, routing, HS256 (own SHA-256),
   JSON and the group-commit queue are Kotlin (Kotlin/Native 2.4.21, `linuxX64`, `-opt`; the JDK runs only the
   compiler at build time). `csrc/` is io_uring (liburing 2.9, MIT, fetched at its tag and sha256-checked) and
   SQLite: rings, provided buffers, direct descriptors, the B-tree cursor reads and the WAL VFS. It is compiled with
   the clang and glibc sysroot that ship with Kotlin/Native.
 - **io_uring:** accepted sockets are direct descriptors in rings that spill past the 65,535 fd cap (up to 8 rings),
-  512 single-shot accepts in flight, multishot receives into provided-buffer rings, and one copy per response. The
+  512 single-shot accepts in flight, multishot receives into provided-buffer rings (4,096 × 2 KB per ring; a
+  receive that runs out is re-armed in the same pass), and one copy per response. The
   buffer-ring registration is retried with `resv[0]=1` for Ubuntu's 6.8.0-136+ kernels (taken on the VM), and
   `bind()` is retried after a restart on 6.8 (`test-restart.sh`).
 - **SQLite:** the unmodified 3.54.1 amalgamation (SHA3-256-checked), WAL, `synchronous=NORMAL`. `GET /posts/:id` and
@@ -37,10 +38,11 @@ outside the folder is touched.
 - **Profile-guided C, recorded on the box during `build.sh`**: an instrumented build serves a synthetic scratch
   database (nothing from the seed) to a training client for ~8 s, then the C is rebuilt with that profile. Nothing
   is committed (ruling on rule 10, 2026-11-15). Any failure falls back to a plain build.
-- **Credit:** rust-iouring-kensac (#264): rings past the fd cap, 512 accepts in flight, bounded re-arm after
-  `ENOBUFS`, the buffer-ring quirk, B-tree reads with schema checks. kotlin-trikeshed-jnorthrup: K/N with the
-  amalgamation built on the box, the struct-style head parse, batch wake. fsharp-uring-delneg and c-iouring-pavlyhalim:
-  the pcache1 `xRekey` method, one `pwrite` per WAL commit, `mlock` of the binary, PGO on a synthetic database.
+- **Credit:** rust-iouring-kensac (#264): rings past the fd cap, 512 accepts in flight, re-arm after
+  `ENOBUFS` (bounded per pass there; the `KN_REARM` knob here), the buffer-ring quirk, B-tree reads with schema
+  checks. kotlin-trikeshed-jnorthrup: K/N with the amalgamation built on the box, the struct-style head parse,
+  batch wake. fsharp-uring-delneg and c-iouring-pavlyhalim: the pcache1 `xRekey` method, one `pwrite` per WAL
+  commit, `mlock` of the binary, PGO on a synthetic database.
   rust-iouring-rkkautsar: one read snapshot across passes. swift-iouring-akbashev: the checkpointer at nice 5.
   go-iouring-DblD: the wider write window. java-iouring-davidhsv (#393): committing on the reading connection, and
   its pass structure as a knob. The README lists the rest.
@@ -52,16 +54,18 @@ with 0 errors (p99 20-22 ms). The highest 60 s pass was 480,000, at the 2 GB mem
 the same rig with the database on tmpfs: 12.9 / 11.2 µs/req.
 
 **Numbers on a twin of the box (VM, not a score)**: Vultr `vhp-1c-2gb-intel` (Cascade Lake, 1 vCPU, 2 GB, Ubuntu
-24.04, kernel 6.8.0-149, no swap, no ufw), load from an 8-vCPU VM over a private network, fresh start and seed per
-run, 60 s ramp. kotlin-nio-3x3xX3N0N (`c0f58b9`) costs 76-81 µs/req there against its official 79.
-- 60 s steps pass from 96,000 to 160,000 users at 26.3 → 22.0 µs/req process (32 → 29 box-wide); 176,000 fails.
-- 5-minute hold at 144,000: PASS, 0 errors, p95 24.7 ms, p99 57.1 ms, 25.0 µs/req, RSS 101 MB. 160,000 fails.
-- java-iouring-davidhsv on the same VM: the same pattern. Steps pass to 160,000; 176,000 fails; the 144,000 hold
-  passes at 24.4 µs/req, p99 36 ms. It scored 240,000 officially, so this VM is much harsher than the box at the top
-  and these are lower bounds.
+24.04, kernel 6.8.0-117, no swap, no ufw, no sysctl), load from four 4-vCPU VMs with one source IP each over a
+private network, fresh start and seed per run, 60 s ramp. The VM's NIC needs 4 queues (`ethtool -L`) or the host
+drops packets above ~30k/s and every entry collapses near 160k. With that, java-iouring-davidhsv (#393) fails at
+the top the way it does on the box (on p99, 0 errors), but lower: it holds 176,000 here against 240,000 officially.
+So these numbers compare the two entries, not the leaderboard.
 
-On that VM the ramp is the limit. Near 150,000 connections it drives the CPU to 100 % and TCP memory past `tcp_mem`.
-The README describes what the kernel then does on 6.8 (aborted connections whose direct descriptors are not released
-at once).
+| | this entry | java-iouring-davidhsv (#393) |
+|---|---|---|
+| 176,000, 5-min hold | PASS, 0 errors, p95 / p99 42 / 281 ms, 41.6 µs/req box-wide, RSS 146 MB | PASS, 0 errors, 71 / 913 ms, 42.5 µs/req, RSS 343 MB |
+| 184,000, 60 s step | FAIL on p99 1.16 s, 0 errors | FAIL on p99 1.43 s, 0 errors |
+| 192,000, 60 s step | FAIL on p99 2.7 s, 0 errors | FAIL on p99 3.1 s, 0 errors |
+
+kotlin-nio-3x3xX3N0N costs 91 µs/req on that VM (79 official), so it runs a little slower than the box.
 
 🤖 Generated with [Claude Code](https://claude.com/claude-code)

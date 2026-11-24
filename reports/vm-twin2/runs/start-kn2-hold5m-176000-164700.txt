@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: d3afcda473d042eabf5b3805f494ce07
+healthy after .135697230 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 0: used=0 accepts=0 cqes=2260489 accepted=66281 sq_ready=3230 cq_ready=0 flags=0
+  ring 1: used=0 accepts=0 cqes=1533588 accepted=65280 sq_ready=3 cq_ready=0 flags=0
+  ring 2: used=0 accepts=512 cqes=244257 accepted=13445 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 1min 12.029s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 4min 8.063s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795556824.132837244 cpu_user=104501 cpu_nice=337 cpu_sys=79025 cpu_idle=34261 cpu_iowait=353685 cpu_irq=0 cpu_softirq=82563 cpu_steal=901 cg_usage_usec=30373 cg_user_usec=4499 cg_system_usec=25873 cg_core_sched.force_idle_usec=0 cg_mem=20340736 cg_peak=20930560 cgm_anon=15138816 cgm_file=2392064 cgm_kernel=2809856 cgm_sock=0 cgm_slab=1310728 rss_kb=20380 nprocs=1 mi_MemTotal=2009056 mi_MemFree=981076 mi_MemAvailable=1663180 mi_Cached=745680 mi_AnonPages=74308 mi_Slab=92100 tcp_inuse=5 tcp_orphan=0 tcp_tw=3 tcp_alloc=6 tcp_mem_pages=149 io_some=84.03 conntrack=none load=0.66 softnet_drop=0 squeeze=5588 enp1s0_rxdrop=0 enp1s0_rxp=4105175 enp1s0_txp=3118823 enp8s0_rxdrop=0 enp8s0_rxp=87806952 enp8s0_txp=57681146 TcpEstabResets=299820 TcpRetransSegs=2882680 TcpOutRsts=3816430 TcpExtSyncookiesSent=0 TcpExtPruneCalled=741816 TcpExtRcvPruned=0 TcpExtListenOverflows=18604 TcpExtListenDrops=18604 TcpExtTCPTimeouts=2337550 TcpExtTCPLossProbes=739504 TcpExtTCPAbortOnData=115 TcpExtTCPAbortOnClose=85764 TcpExtTCPAbortOnMemory=0 TcpExtTCPAbortOnTimeout=184702 TcpExtTCPMemoryPressures=7 TcpExtTCPBacklogDrop=0 TcpExtTCPReqQFullDoCookies=0 TcpExtTCPReqQFullDrop=0 TcpExtTCPOFODrop=1 TcpExtTCPToZeroWindowAdv=0 TcpExtTCPWantZeroWindowAdv=0 TcpExtTCPOrigDataSent=75505329 TcpExtTCPZeroWindowDrop=2 TcpExtTCPRcvQDrop=0

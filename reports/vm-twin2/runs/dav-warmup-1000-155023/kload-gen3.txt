@@ -1,0 +1,26 @@
+kload: 250 VUs -> http://10.79.0.8:80 | ramp 20s hold 20s ramp-down 30s | 4 threads | source IPs 10.79.0.130..10.79.0.130 (1)
+[   10s] vus     92  open     92 |      12 req/s  fail  0.00% | p95   7.5ms  p99    18ms | +    9 conn/s | in    0.4 Mbit/s  out   0.0 Mbit/s
+[   20s] vus    219  open    219 |      27 req/s  fail  0.00% | p95   5.1ms  p99   7.0ms | +   13 conn/s | in    0.6 Mbit/s  out   0.0 Mbit/s
+[   30s] vus    250  open    250 |      26 req/s  fail  0.00% | p95   6.7ms  p99   7.1ms | +    3 conn/s | in    0.5 Mbit/s  out   0.0 Mbit/s
+[   40s] vus    250  open    250 |      28 req/s  fail  0.00% | p95   6.6ms  p99   7.3ms | +    0 conn/s | in    0.5 Mbit/s  out   0.0 Mbit/s
+[   50s] vus    236  open    236 |      24 req/s  fail  0.00% | p95   6.8ms  p99   7.4ms | +    0 conn/s | in    0.3 Mbit/s  out   0.0 Mbit/s
+[   60s] vus    171  open    171 |      18 req/s  fail  0.00% | p95   6.5ms  p99   7.1ms | +    0 conn/s | in    0.2 Mbit/s  out   0.0 Mbit/s
+[   70s] vus     95  open     95 |       6 req/s  fail  0.00% | p95   6.4ms  p99   7.1ms | +    0 conn/s | in    0.1 Mbit/s  out   0.0 Mbit/s
+[   80s] vus     23  open     23 |       1 req/s  fail  0.00% | p95   6.9ms  p99   6.9ms | +    0 conn/s | in    0.0 Mbit/s  out   0.0 Mbit/s
+
+  http_req_duration (whole run, as k6 thresholds see it)
+    avg 1.9ms  med 1.2ms  p90 3.6ms  p95 6.5ms  p99 7.4ms  max 129ms
+  requests      1440 (18/s)   failed 0 (0.000%)   iterations 512
+  hold window   544 reqs (27/s)   failed 0.000%   p95 6.6ms  p99 7.2ms
+  by endpoint
+    GET /feed                    656  failed       0  p95    2.9ms  p99    5.5ms  max    129ms
+    GET /posts/:id               656  failed       0  p95    1.6ms  p99    1.8ms  max     50ms
+    POST /posts/:id/like         118  failed       0  p95    8.1ms  p99     17ms  max     46ms
+    POST /posts                   10  failed       0  p95    7.2ms  p99    7.2ms  max    7.2ms
+  connections   250 attempts (3/s)   failed 0 (bind/port 0)   timeouts 0   keep-alive retries 0   max open 250
+  connect time  med 0.5ms  p99 5.9ms  max 40ms   (not part of http_req_duration, same as k6)
+  network       in 3.2 MB (0.3 Mbit/s avg)   out 0.1 MB (0.0 Mbit/s avg)
+  generator     4 threads   cpu 2s (3% of one core)   rss 149 MB (peak 153 MB, 627.1 KB/VU)
+  self-check    longest event-loop pass 7.0ms, passes over 100ms: 0 (latency is the server's, not kload's)
+
+  thresholds    p(95)<500ms ✓ 6.5ms   p(99)<1000ms ✓ 7.4ms   http_req_failed<1% ✓ 0.000%   =>  PASS

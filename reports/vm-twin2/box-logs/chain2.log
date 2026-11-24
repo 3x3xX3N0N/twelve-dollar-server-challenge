@@ -1,0 +1,10 @@
+21:25:05 label=kn2	vus=160000	pass=PASS	reqs=1909772	err%=0.000	p95=28.5	p99=362.5	hold_p95=158.7	hold_p99=505.9	hold_rps=16884	box_cpu%=72	steal%=0.2	softirq%=28	box_us/req=42.9	proc_us/req=35.9	proc_user_us/req=11.5	rss_mb=101	rss_peak_mb=101	cg_peak_mb=371	memavail_min_mb=946	slab_mb=753	tcp_allo
+21:29:34 label=kn2	vus=176000	pass=PASS	reqs=2100258	err%=0.000	p95=99.8	p99=346.1	hold_p95=175.1	hold_p99=378.9	hold_rps=18549	box_cpu%=79	steal%=0.1	softirq%=32	box_us/req=42.5	proc_us/req=36.1	proc_user_us/req=11.0	rss_mb=106	rss_peak_mb=107	cg_peak_mb=405	memavail_min_mb=951	slab_mb=819	tcp_allo
+21:34:02 label=kn2	vus=192000	pass=FAIL	reqs=2272413	err%=0.000	p95=337.9	p99=2703.4	hold_p95=481.3	hold_p99=3686.4	hold_rps=20048	box_cpu%=87	steal%=0.1	softirq%=36	box_us/req=43.6	proc_us/req=37.9	proc_user_us/req=11.0	rss_mb=111	rss_peak_mb=111	cg_peak_mb=448	memavail_min_mb=713	slab_mb=884	tcp_a
+HIGHEST kn2 176000
+21:38:30 label=knold	vus=144000	pass=PASS	reqs=1720427	err%=0.000	p95=19.6	p99=116.2	hold_p95=20.9	hold_p99=142.3	hold_rps=15214	box_cpu%=66	steal%=0.2	softirq%=25	box_us/req=43.2	proc_us/req=35.4	proc_user_us/req=11.7	rss_mb=78	rss_peak_mb=78	cg_peak_mb=309	memavail_min_mb=971	slab_mb=686	tcp_alloc
+HIGHEST knold 144000
+21:47:00 label=dav-hold5m	vus=176000	pass=PASS	reqs=6552612	err%=0.000	p95=71.2	p99=913.4	hold_p95=59.6	hold_p99=1019.9	hold_rps=18565	box_cpu%=79	steal%=0.2	softirq%=30	box_us/req=42.5	proc_us/req=35.6	proc_user_us/req=12.3	rss_mb=342	rss_peak_mb=343	cg_peak_mb=705	memavail_min_mb=670	slab_mb=822	t
+21:55:28 label=kn2-hold5m	vus=176000	pass=PASS	reqs=6566176	err%=0.000	p95=42.2	p99=280.6	hold_p95=30.8	hold_p99=162.8	hold_rps=18589	box_cpu%=77	steal%=0.1	softirq%=31	box_us/req=41.6	proc_us/req=36.0	proc_user_us/req=11.3	rss_mb=146	rss_peak_mb=146	cg_peak_mb=487	memavail_min_mb=871	slab_mb=823	tc
+22:03:56 label=knold-hold5m	vus=144000	pass=PASS	reqs=5374828	err%=0.000	p95=18.0	p99=99.8	hold_p95=18.3	hold_p99=112.1	hold_rps=15226	box_cpu%=66	steal%=0.2	softirq%=26	box_us/req=43.7	proc_us/req=36.4	proc_user_us/req=11.9	rss_mb=100	rss_peak_mb=100	cg_peak_mb=355	memavail_min_mb=1054	slab_mb=687	
+CHAIN2-DONE

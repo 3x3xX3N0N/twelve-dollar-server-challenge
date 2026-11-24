@@ -1,0 +1,30 @@
+[Tue Nov 24 18:56:20 2026] audit: type=1400 audit(1795546580.351:8): apparmor="STATUS" operation="profile_load" profile="unconfined" name="buildah" pid=559 comm="apparmor_parser"
+[Tue Nov 24 18:56:20 2026] audit: type=1400 audit(1795546580.358:9): apparmor="STATUS" operation="profile_load" profile="unconfined" name="cam" pid=561 comm="apparmor_parser"
+[Tue Nov 24 18:56:20 2026] audit: type=1400 audit(1795546580.368:10): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-checkns" pid=562 comm="apparmor_parser"
+[Tue Nov 24 18:56:20 2026] audit: type=1400 audit(1795546580.372:11): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-run" pid=563 comm="apparmor_parser"
+[Tue Nov 24 18:56:21 2026] lpc_ich 0000:00:1f.0: I/O space for GPIO uninitialized
+[Tue Nov 24 18:56:22 2026] i801_smbus 0000:00:1f.3: Enabling SMBus device
+[Tue Nov 24 18:56:22 2026] i801_smbus 0000:00:1f.3: SMBus using PCI interrupt
+[Tue Nov 24 18:56:22 2026] i2c i2c-0: 1/1 memory slots populated (from DMI)
+[Tue Nov 24 18:56:22 2026] i2c i2c-0: Memory type 0x07 not supported yet, not instantiating SPD
+[Tue Nov 24 18:56:22 2026] RAPL PMU: API unit is 2^-32 Joules, 0 fixed counters, 10737418240 ms ovfl timer
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0: autoconfig for Generic: line_outs=1 (0x3/0x0/0x0/0x0/0x0) type:line
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0:    speaker_outs=0 (0x0/0x0/0x0/0x0/0x0)
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0:    hp_outs=0 (0x0/0x0/0x0/0x0/0x0)
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0:    mono: mono_out=0x0
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0:    inputs:
+[Tue Nov 24 18:56:22 2026] snd_hda_codec_generic hdaudioC0D0:      Line=0x5
+[Tue Nov 24 18:56:22 2026] 8021q: 802.1Q VLAN Support v1.8
+[Tue Nov 24 18:56:22 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 18:56:22 2026] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[Tue Nov 24 18:56:22 2026] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[Tue Nov 24 18:56:22 2026] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[Tue Nov 24 18:56:23 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 18:56:25 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 18:56:25 2026] 8021q: adding VLAN 0 to HW filter on device enp8s0
+[Tue Nov 24 18:56:28 2026] kauditd_printk_skb: 111 callbacks suppressed
+[Tue Nov 24 18:56:28 2026] audit: type=1400 audit(1795546588.339:123): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="rsyslogd" pid=882 comm="apparmor_parser"
+[Tue Nov 24 18:56:28 2026] loop0: detected capacity change from 0 to 8
+[Tue Nov 24 18:56:29 2026] NET: Registered PF_QIPCRTR protocol family
+[Tue Nov 24 18:56:29 2026] audit: type=1400 audit(1795546589.240:124): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="/usr/lib/snapd/snap-confine" pid=974 comm="apparmor_parser"
+[Tue Nov 24 19:17:03 2026] systemd-journald[397]: Under memory pressure, flushing caches.

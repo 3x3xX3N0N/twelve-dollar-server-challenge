@@ -1,0 +1,12 @@
+seed rc=0 40 s: OK: /home/bench/repo/seed/feed.db (238M), content sha256 matches
+java-iouring-davidhsv install rc=0 17 s
+java-iouring-davidhsv build rc=0 128 s; CPU time consumed: 2min 7.239s Memory peak: 840.0K 
+java-iouring-davidhsv test rc=0 130 s: passed=42 failed=0 
+kotlin-native-3x3xX3N0N install rc=0 17 s
+kotlin-native-3x3xX3N0N build rc=0 247 s; CPU time consumed: 3min 58.379s Memory peak: 752.0K 
+== PGO training done; building with the recorded profile
+kotlin-native-3x3xX3N0N test rc=0 207 s: passed=42 failed=0 
+kotlin-nio-3x3xX3N0N install rc=0 10 s
+kotlin-nio-3x3xX3N0N build rc=0 138 s; CPU time consumed: 2min 16.327s Memory peak: 1.2G 
+kotlin-nio-3x3xX3N0N test rc=0 28 s: passed=42 failed=0 
+BUILD-DONE

@@ -1,0 +1,3 @@
+22:08:31 label=kn2	vus=184000	pass=FAIL	reqs=2186820	err%=0.000	p95=234.5	p99=1155.1	hold_p95=366.6	hold_p99=2703.4	hold_rps=19263	box_cpu%=85	steal%=0.1	softirq%=33	box_us/req=44.1	proc_us/req=37.5	proc_user_us/req=11.6	rss_mb=107	rss_peak_mb=107	cg_peak_mb=408	memavail_min_mb=772	slab_mb=853	tcp_a
+22:12:59 label=dav	vus=184000	pass=FAIL	reqs=2182717	err%=0.000	p95=317.4	p99=1433.6	hold_p95=872.4	hold_p99=1646.6	hold_rps=19246	box_cpu%=84	steal%=0.1	softirq%=36	box_us/req=43.5	proc_us/req=35.7	proc_user_us/req=11.0	rss_mb=344	rss_peak_mb=344	cg_peak_mb=665	memavail_min_mb=689	slab_mb=857	tcp_a
+CHAIN3-DONE

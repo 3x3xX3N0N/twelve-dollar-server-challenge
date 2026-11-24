@@ -1,0 +1,33 @@
+2026-11-24T18:51:01Z ssh key f5f1565c-4f50-48a9-9659-f108b0767136
+2026-11-24T18:51:03Z vpc 21e3adc6-df17-49fe-9d54-355d2503ce79
+2026-11-24T18:51:08Z server 01530499-0fcb-4ec8-bd61-69eb967aec1d (vhp-1c-2gb-intel)
+2026-11-24T18:51:09Z gen1 07855229-b52b-456d-b88f-d599296da367 (vhp-8c-16gb-intel)
+2026-11-24T18:51:10Z gen2 37056b69-db02-42f4-b0de-f81cef2a61f7 (vhp-8c-16gb-intel)
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))
+                                                 ~~~~^^^^^^^^^^^^^
+  File "<string>", line 1, in <module>
+    import json,sys;d=json.load(sys.stdin);print(eval(sys.argv[1]))
+    ^^^^^^^^^^^^^
+KeyError: 'instance'
+2026-11-24T18:51:11Z gen3 create failed: {"error":"Server add failed: You have reached the maximum monthly fee limit for this account. To deploy additional services, please request a limit increase.","status":400}
+2026-11-24T18:51:11Z cleanup: deleting instances 01530499-0fcb-4ec8-bd61-69eb967aec1d 07855229-b52b-456d-b88f-d599296da367 37056b69-db02-42f4-b0de-f81cef2a61f7
+2026-11-24T18:51:11Z DELETE 01530499-0fcb-4ec8-bd61-69eb967aec1d -> 204
+2026-11-24T18:51:11Z DELETE 07855229-b52b-456d-b88f-d599296da367 -> 204
+2026-11-24T18:51:11Z DELETE 37056b69-db02-42f4-b0de-f81cef2a61f7 -> 204
+2026-11-24T18:51:11Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:51:22Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:51:32Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:51:43Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:51:53Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:03Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:13Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:24Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:34Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:44Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:52:55Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:53:05Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 400
+2026-11-24T18:53:15Z DELETE vpc 21e3adc6-df17-49fe-9d54-355d2503ce79 -> 204
+2026-11-24T18:53:16Z DELETE ssh-key f5f1565c-4f50-48a9-9659-f108b0767136 -> 204
+2026-11-24T18:53:16Z cleanup done

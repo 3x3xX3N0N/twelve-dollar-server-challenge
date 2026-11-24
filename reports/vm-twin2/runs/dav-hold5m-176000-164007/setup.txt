@@ -1,0 +1,1 @@
+gens=[1 2 3 4] net=vpc nsrc=1 per_gen=44000 ramp=60 hold=300 knenv=[]

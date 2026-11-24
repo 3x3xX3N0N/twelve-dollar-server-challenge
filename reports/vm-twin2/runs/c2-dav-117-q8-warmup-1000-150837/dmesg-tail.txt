@@ -1,0 +1,30 @@
+[Tue Nov 24 19:57:05 2026] systemd[1]: Starting systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev...
+[Tue Nov 24 19:57:05 2026] systemd[1]: Finished systemd-random-seed.service - Load/Save OS Random Seed.
+[Tue Nov 24 19:57:05 2026] systemd[1]: Finished systemd-tmpfiles-setup-dev.service - Create Static Device Nodes in /dev.
+[Tue Nov 24 19:57:05 2026] systemd[1]: Starting systemd-udevd.service - Rule-based Manager for Device Events and Files...
+[Tue Nov 24 19:57:05 2026] systemd[1]: Started multipathd.service - Device-Mapper Multipath Device Controller.
+[Tue Nov 24 19:57:05 2026] systemd[1]: Reached target local-fs-pre.target - Preparation for Local File Systems.
+[Tue Nov 24 19:57:06 2026] systemd[1]: Started systemd-journald.service - Journal Service.
+[Tue Nov 24 19:57:06 2026] systemd-journald[392]: Received client request to flush runtime journal.
+[Tue Nov 24 19:57:06 2026] systemd-journald[392]: /var/log/journal/8f63c444548a49f4934d9a1bb3414fbf/system.journal: Journal file uses a different sequence number ID, rotating.
+[Tue Nov 24 19:57:06 2026] systemd-journald[392]: Rotating system journal.
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.095:2): apparmor="STATUS" operation="profile_load" profile="unconfined" name="1password" pid=545 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.100:3): apparmor="STATUS" operation="profile_load" profile="unconfined" name="Discord" pid=548 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.106:4): apparmor="STATUS" operation="profile_load" profile="unconfined" name=4D6F6E676F444220436F6D70617373 pid=550 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.113:5): apparmor="STATUS" operation="profile_load" profile="unconfined" name="QtWebEngineProcess" pid=552 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.122:6): apparmor="STATUS" operation="profile_load" profile="unconfined" name="balena-etcher" pid=554 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.132:7): apparmor="STATUS" operation="profile_load" profile="unconfined" name="brave" pid=555 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.140:8): apparmor="STATUS" operation="profile_load" profile="unconfined" name="buildah" pid=556 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.147:9): apparmor="STATUS" operation="profile_load" profile="unconfined" name="cam" pid=557 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.151:10): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-checkns" pid=559 comm="apparmor_parser"
+[Tue Nov 24 19:57:07 2026] audit: type=1400 audit(1795550227.158:11): apparmor="STATUS" operation="profile_load" profile="unconfined" name="ch-run" pid=560 comm="apparmor_parser"
+[Tue Nov 24 19:57:09 2026] 8021q: 802.1Q VLAN Support v1.8
+[Tue Nov 24 19:57:09 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 19:57:09 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 19:57:13 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 19:57:13 2026] 8021q: adding VLAN 0 to HW filter on device enp8s0
+[Tue Nov 24 19:57:16 2026] kauditd_printk_skb: 111 callbacks suppressed
+[Tue Nov 24 19:57:16 2026] audit: type=1400 audit(1795550236.527:123): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="rsyslogd" pid=879 comm="apparmor_parser"
+[Tue Nov 24 19:57:16 2026] loop0: detected capacity change from 0 to 8
+[Tue Nov 24 19:57:17 2026] audit: type=1400 audit(1795550237.333:124): apparmor="STATUS" operation="profile_replace" profile="unconfined" name="/usr/lib/snapd/snap-confine" pid=969 comm="apparmor_parser"
+[Tue Nov 24 19:57:29 2026] systemd-journald[392]: /var/log/journal/8f63c444548a49f4934d9a1bb3414fbf/user-1001.journal: Journal file uses a different sequence number ID, rotating.

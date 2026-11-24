@@ -1,0 +1,30 @@
+[Tue Nov 24 20:33:50 2026] kmalloc-32                16KB         36KB
+[Tue Nov 24 20:33:50 2026] kmalloc-16                 4KB          4KB
+[Tue Nov 24 20:33:50 2026] kmalloc-8                  4KB          4KB
+[Tue Nov 24 20:33:50 2026] kmem_cache_node           24KB         24KB
+[Tue Nov 24 20:33:50 2026] kmem_cache                96KB         96KB
+[Tue Nov 24 20:33:50 2026] Tasks state (memory values in pages):
+[Tue Nov 24 20:33:50 2026] [  pid  ]   uid  tgid total_vm      rss rss_anon rss_file rss_shmem pgtables_bytes swapents oom_score_adj name
+[Tue Nov 24 20:33:50 2026] [    392]     0   392    16714     1138      288      830        20   122880        0          -250 systemd-journal
+[Tue Nov 24 20:33:50 2026] [    427]     0   427    72240     6784     4608     2176         0   118784        0         -1000 multipathd
+[Tue Nov 24 20:33:50 2026] [    431]     0   431     6565     1391      751      640         0    77824        0         -1000 systemd-udevd
+[Tue Nov 24 20:33:50 2026] [    571]   992   571     5337     1280      512      768         0    86016        0             0 systemd-resolve
+[Tue Nov 24 20:33:50 2026] [    573]   997   573    22759      992      224      768         0    81920        0             0 systemd-timesyn
+[Tue Nov 24 20:33:50 2026] [    808]   998   808     4778     1024      288      736         0    81920        0             0 systemd-network
+[Tue Nov 24 20:33:50 2026] [    854]     0   854     1519      480       64      416         0    57344        0             0 less
+[Tue Nov 24 20:33:50 2026] [    855]     0   855     1707      576       32      544         0    57344        0             0 cron
+[Tue Nov 24 20:33:50 2026] [    856]   101   856     2450     1120      224      896         0    61440        0          -900 dbus-daemon
+[Tue Nov 24 20:33:50 2026] [    860]   991   860    95919     1542      614      928         0   110592        0             0 polkitd
+[Tue Nov 24 20:33:50 2026] [    871]     0   871     4539     1111      311      800         0    77824        0             0 systemd-logind
+[Tue Nov 24 20:33:50 2026] [    876]     0   876   117211     1408      512      896         0   155648        0             0 udisksd
+[Tue Nov 24 20:33:50 2026] [    883]     0   883     3007      864      256      608         0    65536        0         -1000 sshd
+[Tue Nov 24 20:33:50 2026] [    931]   103   931    55629     1376      512      864         0    81920        0             0 rsyslogd
+[Tue Nov 24 20:33:50 2026] [    950]     0   950    98010     1376      512      864         0   131072        0             0 ModemManager
+[Tue Nov 24 20:33:50 2026] [    952]     0   952     1527      480       32      448         0    57344        0             0 agetty
+[Tue Nov 24 20:33:50 2026] [    996]     0   996      687      672       96      576         0    45056        0         -1000 watchdog
+[Tue Nov 24 20:33:50 2026] [   5796]     0  5796    78488     1024      352      672         0   114688        0             0 upowerd
+[Tue Nov 24 20:33:50 2026] [  22654]  1001 22654   319876    93137    91249     1888         0  1056768        0             0 server
+[Tue Nov 24 20:33:50 2026] [  22695]     0 22695     1836      544       32      512         0    65536        0             0 bash
+[Tue Nov 24 20:33:50 2026] [  24873]     0 24873     1422      416        0      416         0    57344        0             0 sleep
+[Tue Nov 24 20:33:50 2026] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/system.slice/srv.service,task=server,pid=22654,uid=1001
+[Tue Nov 24 20:33:50 2026] Out of memory: Killed process 22654 (server) total-vm:1279504kB, anon-rss:364996kB, file-rss:7552kB, shmem-rss:0kB, UID:1001 pgtables:1032kB oom_score_adj:0

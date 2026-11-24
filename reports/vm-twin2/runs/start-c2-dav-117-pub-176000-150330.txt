@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: a89123308d89485582f79d19d203926e
+healthy after .926572378 s: {"status":"ok","db":"ok","uptime_s":0}
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 1min 11.647s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 1min 15.629s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795550614.913943144 cpu_user=3777 cpu_nice=5 cpu_sys=4223 cpu_idle=1564 cpu_iowait=24388 cpu_irq=0 cpu_softirq=4800 cpu_steal=80 cg_usage_usec=887906 cg_user_usec=795272 cg_system_usec=92633 cg_core_sched.force_idle_usec=0 cg_mem=55590912 cg_peak=55836672 cgm_anon=49012736 cgm_file=2183168 cgm_kernel=4395008 cgm_sock=0 cgm_slab=1484592 rss_kb=75180 nprocs=1 mi_MemTotal=2009056 mi_MemFree=1118960 mi_MemAvailable=1648056 mi_Cached=649976 mi_AnonPages=99876 mi_Slab=87568 tcp_inuse=12 tcp_orphan=0 tcp_tw=3 tcp_alloc=13 tcp_mem_pages=232 io_some=85.49 conntrack=none load=0.34 softnet_drop=0 squeeze=551 enp1s0_rxdrop=0 enp1s0_rxp=634 enp1s0_txp=691 enp8s0_rxdrop=0 enp8s0_rxp=3986793 enp8s0_txp=3235229 TcpEstabResets=104118 TcpRetransSegs=1247074 TcpOutRsts=251205 TcpExtSyncookiesSent=0 TcpExtPruneCalled=407840 TcpExtRcvPruned=0 TcpExtListenOverflows=0 TcpExtListenDrops=0 TcpExtTCPTimeouts=1271351 TcpExtTCPLossProbes=88192 TcpExtTCPAbortOnData=0 TcpExtTCPAbortOnClose=0 TcpExtTCPAbortOnMemory=0 TcpExtTCPAbortOnTimeout=107607 TcpExtTCPMemoryPressures=2 TcpExtTCPBacklogDrop=0 TcpExtTCPReqQFullDoCookies=0 TcpExtTCPReqQFullDrop=0 TcpExtTCPOFODrop=1 TcpExtTCPToZeroWindowAdv=0 TcpExtTCPWantZeroWindowAdv=0 TcpExtTCPOrigDataSent=2560412 TcpExtTCPZeroWindowDrop=1 TcpExtTCPRcvQDrop=0

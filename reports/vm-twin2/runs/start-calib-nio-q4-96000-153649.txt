@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 13a9bccd1f71476a83641f7a0fdd5d08
+healthy after 2.593401249 s: {"status":"ok","db":"ok","uptime_s":0}
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 1min 34.222s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+srv.service: A process of this unit has been killed by the OOM killer.
+srv.service: Main process exited, code=killed, status=9/KILL
+srv.service: Failed with result 'oom-kill'.
+srv.service: Consumed 41.176s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 0 listening on 0.0.0.0:80
+worker 2 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+t=1795552615.100456358 cpu_user=16659 cpu_nice=28 cpu_sys=19610 cpu_idle=16417 cpu_iowait=160456 cpu_irq=0 cpu_softirq=20787 cpu_steal=340 cg_usage_usec=2410871 cg_user_usec=2179744 cg_system_usec=231126 cg_core_sched.force_idle_usec=0 cg_mem=180121600 cg_peak=180359168 cgm_anon=128098304 cgm_file=48873472 cgm_kernel=3149824 cgm_sock=0 cgm_slab=1402456 rss_kb=207464 nprocs=4 mi_MemTotal=2009056 mi_MemFree=1072812 mi_MemAvailable=1566088 mi_Cached=619732 mi_AnonPages=178372 mi_Slab=81636 tcp_inuse=4 tcp_orphan=0 tcp_tw=2 tcp_alloc=8 tcp_mem_pages=25 io_some=1.69 conntrack=none load=0.56 softnet_drop=0 squeeze=2004 enp1s0_rxdrop=0 enp1s0_rxp=4095974 enp1s0_txp=3110569 enp8s0_rxdrop=0 enp8s0_rxp=19584805 enp8s0_txp=14826287 TcpEstabResets=299815 TcpRetransSegs=2462364 TcpOutRsts=3815273 TcpExtSyncookiesSent=0 TcpExtPruneCalled=741816 TcpExtRcvPruned=0 TcpExtListenOverflows=18604 TcpExtListenDrops=18604 TcpExtTCPTimeouts=2337442 TcpExtTCPLossProbes=319329 TcpExtTCPAbortOnData=111 TcpExtTCPAbortOnClose=85764 TcpExtTCPAbortOnMemory=0 TcpExtTCPAbortOnTimeout=184690 TcpExtTCPMemoryPressures=6 TcpExtTCPBacklogDrop=0 TcpExtTCPReqQFullDoCookies=0 TcpExtTCPReqQFullDrop=0 TcpExtTCPOFODrop=1 TcpExtTCPToZeroWindowAdv=0 TcpExtTCPWantZeroWindowAdv=0 TcpExtTCPOrigDataSent=15561026 TcpExtTCPZeroWindowDrop=2 TcpExtTCPRcvQDrop=0

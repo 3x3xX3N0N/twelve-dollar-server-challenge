@@ -1,0 +1,34 @@
+kload: 46000 VUs -> http://10.79.0.8:80 | ramp 1m hold 1m ramp-down 30s | 4 threads | source IPs 10.79.0.110..10.79.0.110 (1)
+[   10s] vus   5672  open   5670 |     762 req/s  fail  0.00% | p95   2.8ms  p99   4.2ms | +  567 conn/s | in   16.6 Mbit/s  out   0.4 Mbit/s
+[   20s] vus  13336  open  13335 |    1647 req/s  fail  0.00% | p95   5.5ms  p99    24ms | +  765 conn/s | in   24.9 Mbit/s  out   1.1 Mbit/s
+[   30s] vus  21054  open  21054 |    2381 req/s  fail  0.00% | p95   6.4ms  p99   9.2ms | +  772 conn/s | in   39.8 Mbit/s  out   1.6 Mbit/s
+[   40s] vus  28724  open  28724 |    3280 req/s  fail  0.00% | p95    17ms  p99    41ms | +  767 conn/s | in   50.2 Mbit/s  out   2.3 Mbit/s
+[   50s] vus  36350  open  36350 |    3995 req/s  fail  0.00% | p95    23ms  p99    76ms | +  762 conn/s | in   62.6 Mbit/s  out   2.8 Mbit/s
+[   60s] vus  44039  open  44039 |    4863 req/s  fail  0.00% | p95   204ms  p99   330ms | +  769 conn/s | in   74.3 Mbit/s  out   3.4 Mbit/s
+[   70s] vus  46000  open  46000 |    4647 req/s  fail  0.00% | p95  1712ms  p99  2310ms | +  196 conn/s | in   68.4 Mbit/s  out   3.4 Mbit/s
+[   80s] vus  46000  open  46000 |    4799 req/s  fail  0.00% | p95   251ms  p99   326ms | +    0 conn/s | in   68.4 Mbit/s  out   3.5 Mbit/s
+[   90s] vus  46000  open  46000 |    4821 req/s  fail  0.00% | p95    19ms  p99    34ms | +    0 conn/s | in   71.5 Mbit/s  out   3.5 Mbit/s
+[  100s] vus  46000  open  46000 |    4898 req/s  fail  0.00% | p95    20ms  p99    50ms | +    0 conn/s | in   71.2 Mbit/s  out   3.6 Mbit/s
+[  110s] vus  46000  open  46000 |    4845 req/s  fail  0.00% | p95   136ms  p99   216ms | +    0 conn/s | in   71.6 Mbit/s  out   3.5 Mbit/s
+[  120s] vus  46000  open  46000 |    4881 req/s  fail  0.00% | p95   281ms  p99   367ms | +    0 conn/s | in   71.3 Mbit/s  out   3.5 Mbit/s
+[  130s] vus  42330  open  42330 |    4316 req/s  fail  0.00% | p95   354ms  p99   457ms | +    0 conn/s | in   59.5 Mbit/s  out   3.2 Mbit/s
+[  140s] vus  30671  open  30673 |    2967 req/s  fail  0.00% | p95    20ms  p99    50ms | +    0 conn/s | in   36.8 Mbit/s  out   2.4 Mbit/s
+[  150s] vus  15390  open  15390 |    1301 req/s  fail  0.00% | p95   6.8ms  p99   8.8ms | +    0 conn/s | in   12.8 Mbit/s  out   1.1 Mbit/s
+[  160s] vus   3811  open   3812 |     168 req/s  fail  0.00% | p95    87ms  p99   375ms | +    0 conn/s | in    0.3 Mbit/s  out   0.2 Mbit/s
+
+  http_req_duration (whole run, as k6 thresholds see it)
+    avg 70ms  med 5.0ms  p90 142ms  p95 317ms  p99 1434ms  max 3265ms
+  requests      545836 (3411/s)   failed 0 (0.000%)   iterations 228228
+  hold window   288858 reqs (4814/s)   failed 0.000%   p95 856ms  p99 1647ms
+  by endpoint
+    GET /feed                 251606  failed       0  p95    297ms  p99   1352ms  max   3008ms
+    GET /posts/:id            251606  failed       0  p95    313ms  p99   1434ms  max   2338ms
+    POST /posts/:id/like       37699  failed       0  p95    469ms  p99   2073ms  max   3265ms
+    POST /posts                 4925  failed       0  p95    399ms  p99   1892ms  max   3234ms
+  connections   46000 attempts (287/s)   failed 0 (bind/port 0)   timeouts 0   keep-alive retries 0   max open 46000
+  connect time  med 0.3ms  p99 4.7ms  max 65ms   (not part of http_req_duration, same as k6)
+  network       in 1000.5 MB (50.0 Mbit/s avg)   out 49.6 MB (2.5 Mbit/s avg)
+  generator     4 threads   cpu 28s (17% of one core)   rss 273 MB (peak 273 MB, 6.1 KB/VU)
+  self-check    longest event-loop pass 9.8ms, passes over 100ms: 0 (latency is the server's, not kload's)
+
+  thresholds    p(95)<500ms ✓ 317ms   p(99)<1000ms ✗ 1434ms   http_req_failed<1% ✓ 0.000%   =>  FAIL
