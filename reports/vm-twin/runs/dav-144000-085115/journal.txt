@@ -1,0 +1,2 @@
+2026-11-24T13:51:46+00:00 twin-server bash[39916]: ring 1 added
+2026-11-24T13:52:13+00:00 twin-server bash[39916]: ring 2 added

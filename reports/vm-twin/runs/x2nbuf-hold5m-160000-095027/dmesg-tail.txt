@@ -1,0 +1,20 @@
+[Tue Nov 24 14:55:54 2026] [  69530]  1001 69530    85107    50173    48413     1760         0   479232        0             0 server.kexe
+[Tue Nov 24 14:55:54 2026] [  69547]     0 69547     1836      576       64      512         0    61440        0             0 bash
+[Tue Nov 24 14:55:54 2026] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task_memcg=/system.slice/srv.service,task=server.kexe,pid=69530,uid=1001
+[Tue Nov 24 14:55:54 2026] Out of memory: Killed process 69530 (server.kexe) total-vm:340428kB, anon-rss:193652kB, file-rss:7040kB, shmem-rss:0kB, UID:1001 pgtables:468kB oom_score_adj:0
+[Tue Nov 24 14:55:57 2026] oom_reaper: reaped process 69530 (server.kexe), now anon-rss:0kB, file-rss:2360kB, shmem-rss:0kB
+[Tue Nov 24 14:55:57 2026] systemd-journald[397]: Under memory pressure, flushing caches.
+[Tue Nov 24 14:55:57 2026] workqueue: io_fallback_req_func hogged CPU for >10000us 16 times, consider switching to WQ_UNBOUND
+[Tue Nov 24 14:55:58 2026] workqueue: delayed_fput hogged CPU for >10000us 4 times, consider switching to WQ_UNBOUND
+[Tue Nov 24 14:55:58 2026] net_ratelimit: 112379 callbacks suppressed
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:55:58 2026] TCP: out of memory -- consider tuning tcp_mem
+[Tue Nov 24 14:56:00 2026] systemd-journald[397]: Under memory pressure, flushing caches.

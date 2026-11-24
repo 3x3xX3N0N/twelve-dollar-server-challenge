@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: c7a2ae05eb6a4faca4b6dcb4180260d8
+healthy after .928848141 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 2: used=17185 accepts=0 cqes=524086 accepted=40419 sq_ready=5 cq_ready=17 flags=0
+stats: open=102286 rings=3 enobufs=15509 rearms=15509 sweeps=0 accept_err=0 btree=1394475 sql=0 snapshots=5616 parked=2874 walw=370596 walpw=10945 commits loop=5344 thread=281 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=64932 accepts=345 cqes=1786231 accepted=102654 sq_ready=29 cq_ready=5 flags=0
+  ring 1: used=32102 accepts=167 cqes=1204133 accepted=73620 sq_ready=15 cq_ready=11 flags=0
+  ring 2: used=5252 accepts=0 cqes=550982 accepted=40419 sq_ready=1 cq_ready=3 flags=0
+stats: open=58992 rings=3 enobufs=15509 rearms=15509 sweeps=0 accept_err=0 btree=1435286 sql=0 snapshots=6068 parked=3056 walw=397814 walpw=11758 commits loop=5795 thread=281 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=45470 accepts=512 cqes=1920066 accepted=105171 sq_ready=7 cq_ready=4 flags=0
+  ring 1: used=13493 accepts=0 cqes=1261214 accepted=73853 sq_ready=1 cq_ready=8 flags=0
+  ring 2: used=29 accepts=0 cqes=561429 accepted=40419 sq_ready=0 cq_ready=1 flags=0
+stats: open=6754 rings=3 enobufs=15509 rearms=15509 sweeps=0 accept_err=0 btree=1438647 sql=0 snapshots=6299 parked=3095 walw=405701 walpw=12263 commits loop=6129 thread=281 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=5955 accepts=512 cqes=2017446 accepted=105171 sq_ready=19 cq_ready=0 flags=0
+  ring 1: used=799 accepts=0 cqes=1286974 accepted=73853 sq_ready=3 cq_ready=0 flags=0
+  ring 2: used=0 accepts=0 cqes=561487 accepted=40419 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 53.070s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795527410.336251295 cpu_user=99996 cpu_nice=287 cpu_sys=31624 cpu_idle=35598 cpu_iowait=129672 cpu_irq=0 cpu_softirq=23448 cpu_steal=265 cg_usage_usec=876186 cg_user_usec=760819 cg_system_usec=115367 cg_core_sched.force_idle_usec=0 cg_mem=93343744 cg_peak=93589504 cgm_anon=49324032 cgm_file=39620608 cgm_kernel=4399104 cgm_sock=0 cgm_slab=1486848 rss_kb=75352 nprocs=1 mi_MemTotal=2009040 mi_MemFree=939420 mi_MemAvailable=1494512 mi_Cached=680236 mi_AnonPages=99924 mi_Slab=175784 tcp_inuse=22 tcp_orphan=10 tcp_tw=2 tcp_alloc=23 tcp_mem_pages=22 io_some=76.79 conntrack=none load=0.67

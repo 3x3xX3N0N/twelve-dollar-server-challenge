@@ -1,0 +1,5 @@
+Running as unit: srv.service; invocation ID: d7981bd4c87a4b779e2d59a12fe4ec8e
+13:01:45 label=calib-nio	vus=96000	pass=PASS	reqs=1146008	err%=0.000	p95=50.4	p99=191.5	hold_p95=58.6	hold_p99=230.4	hold_rps=10116	box_cpu%=86	steal%=0.0	softirq%=14	box_us/req=84.9	proc_us/req=80.6	proc_user_us/req=45.3	rss_mb=435	rss_peak_mb=435	cg_peak_mb=544	memavail_min_mb=947	slab_mb=582	tcp_inuse=4	conntrack=none	max_open=96000	conn_failed=0	timeouts=0	gen_stalls=0	gen_cpu_s=54.05	slow_com
+Running as unit: srv.service; invocation ID: 0578f3012e2b49029e97f421c973ad83
+13:06:05 label=calib-nio	vus=112000	pass=PASS	reqs=1337690	err%=0.000	p95=71.2	p99=195.6	hold_p95=60.7	hold_p99=183.3	hold_rps=11833	box_cpu%=94	steal%=0.0	softirq%=15	box_us/req=79.1	proc_us/req=75.8	proc_user_us/req=42.4	rss_mb=443	rss_peak_mb=445	cg_peak_mb=573	memavail_min_mb=888	slab_mb=647	tcp_inuse=4	conntrack=none	max_open=112000	conn_failed=0	timeouts=0	gen_stalls=0	gen_cpu_s=61.31	slow_c
+HIGHEST-PASS calib-nio 112000

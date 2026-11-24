@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: d36f5d58dd254cc5acb3167d707e684c
+healthy after .137022703 s: {"status":"ok","db":"ok","uptime_s":0}
+worker 1 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+srv.service: Consumed 2min 4.045s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 2 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+srv.service: Consumed 2min 11.806s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795525591.206328856 cpu_user=86434 cpu_nice=159 cpu_sys=13851 cpu_idle=34402 cpu_iowait=1556 cpu_irq=0 cpu_softirq=4677 cpu_steal=25 cg_usage_usec=32792 cg_user_usec=7079 cg_system_usec=25713 cg_core_sched.force_idle_usec=0 cg_mem=20221952 cg_peak=20938752 cgm_anon=15093760 cgm_file=2318336 cgm_kernel=2809856 cgm_sock=0 cgm_slab=1311048 rss_kb=20336 nprocs=1 mi_MemTotal=2009040 mi_MemFree=514288 mi_MemAvailable=1636388 mi_Cached=1120752 mi_AnonPages=66064 mi_Slab=177452 tcp_inuse=5 tcp_orphan=0 tcp_tw=2 tcp_alloc=6 tcp_mem_pages=192 io_some=18.38 conntrack=none load=1.12

@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: ae19be3d88144716b772970978861c57
+healthy after .127903539 s: {"status":"ok","db":"ok","uptime_s":0}
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 53.967s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 55.375s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795529220.427393570 cpu_user=116917 cpu_nice=326 cpu_sys=48262 cpu_idle=36425 cpu_iowait=256363 cpu_irq=0 cpu_softirq=40877 cpu_steal=574 cg_usage_usec=23520 cg_user_usec=6189 cg_system_usec=17330 cg_core_sched.force_idle_usec=0 cg_mem=20357120 cg_peak=20971520 cgm_anon=15089664 cgm_file=2453504 cgm_kernel=2813952 cgm_sock=0 cgm_slab=1318016 rss_kb=20244 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1129916 mi_MemAvailable=1603424 mi_Cached=618456 mi_AnonPages=74376 mi_Slab=139064 tcp_inuse=48 tcp_orphan=43 tcp_tw=2 tcp_alloc=49 tcp_mem_pages=168 io_some=71.86 conntrack=none load=0.48

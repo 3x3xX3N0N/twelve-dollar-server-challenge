@@ -1,0 +1,7 @@
+Running as unit: srv.service; invocation ID: d7981bd4c87a4b779e2d59a12fe4ec8e
+healthy after 2.076287260 s: {"status":"ok","db":"ok","uptime_s":0}
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 2 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+t=1795525051.197508451 cpu_user=70945 cpu_nice=4 cpu_sys=5962 cpu_idle=9103 cpu_iowait=1193 cpu_irq=0 cpu_softirq=318 cpu_steal=8 cg_usage_usec=2016163 cg_user_usec=1856583 cg_system_usec=159579 cg_core_sched.force_idle_usec=0 cg_mem=136536064 cg_peak=136794112 cgm_anon=128122880 cgm_file=5496832 cgm_kernel=2916352 cgm_sock=0 cgm_slab=1168208 rss_kb=208348 nprocs=4 mi_MemTotal=2009040 mi_MemFree=241252 mi_MemAvailable=1525852 mi_Cached=1273112 mi_AnonPages=179764 mi_Slab=181668 tcp_inuse=4 tcp_orphan=0 tcp_tw=40 tcp_alloc=8 tcp_mem_pages=221 io_some=0.81 conntrack=none load=0.78

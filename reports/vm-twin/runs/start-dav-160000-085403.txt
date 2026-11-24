@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 095ad679f0ea47cf86266ee5e9a2e2e9
+healthy after .633172704 s: {"status":"ok","db":"ok","uptime_s":0}
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 44.932s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 47.041s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795528447.130334078 cpu_user=109443 cpu_nice=308 cpu_sys=40464 cpu_idle=35868 cpu_iowait=204789 cpu_irq=0 cpu_softirq=31843 cpu_steal=476 cg_usage_usec=753098 cg_user_usec=673613 cg_system_usec=79485 cg_core_sched.force_idle_usec=0 cg_mem=60145664 cg_peak=60227584 cgm_anon=55713792 cgm_file=28672 cgm_kernel=4403200 cgm_sock=0 cgm_slab=1486248 rss_kb=81664 nprocs=1 mi_MemTotal=2009040 mi_MemFree=895956 mi_MemAvailable=1592460 mi_Cached=717120 mi_AnonPages=114148 mi_Slab=166320 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=7 io_some=81.60 conntrack=none load=0.30

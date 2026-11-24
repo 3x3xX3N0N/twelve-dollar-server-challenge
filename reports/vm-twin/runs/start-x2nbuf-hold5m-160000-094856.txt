@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: fdd1948439984104b22260b6d8e46f73
+healthy after .044716466 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 1: used=29789 accepts=0 cqes=4057881 accepted=112381 sq_ready=2 cq_ready=5 flags=0
+  ring 2: used=11308 accepts=0 cqes=1400428 accepted=47423 sq_ready=0 cq_ready=0 flags=0
+stats: open=44466 rings=3 enobufs=224693 rearms=224691 sweeps=0 accept_err=0 btree=4216131 sql=0 snapshots=13166 parked=12179 walw=1170811 walpw=26530 commits loop=2239 thread=10755 busy=0 slow=1 ckslow=0 memslow=0
+  ends: recv_eof=94224 shuts=2 send_zero=0 recv_e110=150373 send_e110=2
+  ring 0: used=28377 accepts=512 cqes=4791258 accepted=129259 sq_ready=3 cq_ready=1 flags=0
+  ring 1: used=10987 accepts=0 cqes=4110642 accepted=112381 sq_ready=2 cq_ready=1 flags=0
+  ring 2: used=5102 accepts=0 cqes=1420971 accepted=47423 sq_ready=1 cq_ready=0 flags=0
+stats: open=2 rings=3 enobufs=224693 rearms=224691 sweeps=0 accept_err=0 btree=4218214 sql=0 snapshots=13353 parked=12231 walw=1176679 walpw=26893 commits loop=2239 thread=11044 busy=0 slow=1 ckslow=0 memslow=0
+  ends: recv_eof=138699 shuts=2 send_zero=0 recv_e110=150373 send_e110=2
+  ring 0: used=2 accepts=512 cqes=4861373 accepted=129270 sq_ready=4 cq_ready=0 flags=0
+  ring 1: used=0 accepts=0 cqes=4133884 accepted=112381 sq_ready=25 cq_ready=0 flags=0
+  ring 2: used=0 accepts=0 cqes=1432017 accepted=47423 sq_ready=17 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kn-exp2/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kn-exp2/start.sh.
+srv.service: Consumed 3min 8.483s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kn-exp2/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795531739.839765661 cpu_user=146689 cpu_nice=555 cpu_sys=85410 cpu_idle=45363 cpu_iowait=382866 cpu_irq=0 cpu_softirq=86937 cpu_steal=1132 cg_usage_usec=25077 cg_user_usec=4361 cg_system_usec=20716 cg_core_sched.force_idle_usec=0 cg_mem=18890752 cg_peak=19656704 cgm_anon=15339520 cgm_file=724992 cgm_kernel=2826240 cgm_sock=0 cgm_slab=1326216 rss_kb=20576 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1217160 mi_MemAvailable=1563660 mi_Cached=550960 mi_AnonPages=76788 mi_Slab=90396 tcp_inuse=203 tcp_orphan=196 tcp_tw=2 tcp_alloc=204 tcp_mem_pages=237 io_some=68.31 conntrack=none load=1.14

@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: ce92bcdc1f5a48d7befc49295e49a3a0
+healthy after .805610402 s: {"status":"ok","db":"ok","uptime_s":0}
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 53.526s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 53.967s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795528963.339213228 cpu_user=114472 cpu_nice=321 cpu_sys=45626 cpu_idle=36207 cpu_iowait=239497 cpu_irq=0 cpu_softirq=37616 cpu_steal=536 cg_usage_usec=893069 cg_user_usec=793610 cg_system_usec=99459 cg_core_sched.force_idle_usec=0 cg_mem=79716352 cg_peak=79958016 cgm_anon=55738368 cgm_file=19521536 cgm_kernel=4456448 cgm_sock=0 cgm_slab=1529944 rss_kb=81696 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1088920 mi_MemAvailable=1502332 mi_Cached=616184 mi_AnonPages=114280 mi_Slab=137744 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=197 io_some=70.76 conntrack=none load=0.56

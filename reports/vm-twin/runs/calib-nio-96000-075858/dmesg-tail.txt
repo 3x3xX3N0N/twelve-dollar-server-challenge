@@ -1,0 +1,20 @@
+[Tue Nov 24 12:43:01 2026] RAPL PMU: API unit is 2^-32 Joules, 0 fixed counters, 10737418240 ms ovfl timer
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0: autoconfig for Generic: line_outs=1 (0x3/0x0/0x0/0x0/0x0) type:line
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0:    speaker_outs=0 (0x0/0x0/0x0/0x0/0x0)
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0:    hp_outs=0 (0x0/0x0/0x0/0x0/0x0)
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0:    mono: mono_out=0x0
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0:    inputs:
+[Tue Nov 24 12:43:01 2026] snd_hda_codec_generic hdaudioC0D0:      Line=0x5
+[Tue Nov 24 12:43:01 2026] 8021q: 802.1Q VLAN Support v1.8
+[Tue Nov 24 12:43:01 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 12:43:01 2026] cfg80211: Loading compiled-in X.509 certificates for regulatory database
+[Tue Nov 24 12:43:01 2026] Loaded X.509 cert 'sforshee: 00b28ddf47aef9cea7'
+[Tue Nov 24 12:43:01 2026] Loaded X.509 cert 'wens: 61c038651aabdcf94bd0ac7ff06c7248db18c600'
+[Tue Nov 24 12:43:03 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 12:43:06 2026] 8021q: adding VLAN 0 to HW filter on device enp1s0
+[Tue Nov 24 12:43:06 2026] 8021q: adding VLAN 0 to HW filter on device enp8s0
+[Tue Nov 24 12:43:09 2026] kauditd_printk_skb: 111 callbacks suppressed
+[Tue Nov 24 12:43:09 2026] audit: type=1400 audit(1795524189.818:123): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="rsyslogd" pid=883 comm="apparmor_parser"
+[Tue Nov 24 12:43:10 2026] loop0: detected capacity change from 0 to 8
+[Tue Nov 24 12:43:10 2026] NET: Registered PF_QIPCRTR protocol family
+[Tue Nov 24 12:43:10 2026] audit: type=1400 audit(1795524190.559:124): apparmor="STATUS" operation="profile_replace" info="same as current profile, skipping" profile="unconfined" name="/usr/lib/snapd/snap-confine" pid=974 comm="apparmor_parser"

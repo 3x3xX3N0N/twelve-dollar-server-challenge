@@ -149,11 +149,36 @@ not a NIC, so these numbers rank designs, they are not a score. Run-to-run noise
   4.4 (B-tree reads + JSON ~2, Kotlin ~0.7). java-iouring-davidhsv on the same rig: kernel 8.8, user 5.6.
 - Earlier steps (160k users): SQL only 30-44 µs/req → B-tree reads 22-30 → b3's loop/commit tricks ~15 → this round
   (commit on the reader, PGO) ~13.
-- The limit is memory, not CPU: ~4.1 KB of kernel socket memory per connection; 480k users reach the 2 GB wall.
-  Process RSS is 20 MB idle and ~70-130 MB under load.
+- On this desktop the limit is memory, not CPU: ~4.1 KB of kernel socket memory per connection; 480k users reach
+  the 2 GB wall. Process RSS is 20 MB idle and ~70-130 MB under load. A real 1 vCPU box stops much earlier (below).
 - Build: from a clean `build/` (SQLite and liburing downloaded again; the Kotlin/Native toolchain already in
   `~/.konan`) on one core inside a 1.5 GB no-swap cgroup: 178 s including the ~8 s training run, cgroup peak 584 MB
   (548 MB anonymous). The first build on a box also downloads the Kotlin/Native toolchain (~560 MB anonymous peak).
+
+## Measured on a twin of the scored box (VM, not a score)
+
+Vultr `vhp-1c-2gb-intel` (Cascade Lake, 1 vCPU, 1,962 MiB, Ubuntu 24.04, stock kernel 6.8.0-149, no swap, no ufw),
+load from an 8-vCPU VM in the same datacenter over a private network. Each run on a fresh start and a fresh seed copy;
+`load.js`'s user model and thresholds (kload), 60 s ramp. Calibration: the JVM entry kotlin-nio-3x3xX3N0N costs
+76-81 µs/req there (79 official), so per-request CPU carries over. The top end does not: java-iouring-davidhsv, which
+holds 240,000 officially, also fails 176,000 on this twin, so read these as a lower bound.
+
+| Users | Run | Result | CPU µs/req (process / box) | p95 / p99 | RSS |
+|---|---|---|---|---|---|
+| 96,000-160,000 | 60 s steps | PASS (all five) | 26.3 → 22.0 / 32.1 → 28.9 | 9.9 / 21.4 → 33.0 / 169 ms | 66-78 MB |
+| 144,000 | 5-min hold | PASS, 0 errors | 25.0 / 31.8 | 24.7 / 57.1 ms | 101 MB |
+| 160,000 | 5-min hold | FAIL (java-iouring-davidhsv too) | | | |
+| 176,000 | 60 s step ×2 | FAIL (java-iouring-davidhsv too) | | | |
+
+java-iouring-davidhsv on the same twin: 20.2-24.3 µs/req process, 28.2-36.1 box; 144,000 hold PASS at 24.4 / 32.2,
+p95 / p99 20.6 / 36.1 ms, RSS 209 MB. On this box the two cost the same per request box-wide.
+- The wall is the 60 s ramp. Around 150k connections the ramp pushes the CPU to 100 %, TCP memory passes `tcp_mem`
+  (170 MB on a 2 GB box), and the kernel aborts connections (`ETIMEDOUT` on the receive, ~45k per spike). On 6.8,
+  closing a direct descriptor is not released while older multishot receives are in flight: the aborted sockets stay
+  allocated, the clients reconnect after their 60 s timeout, and memory climbs (an OOM in the 160k hold). As far as
+  I can tell, kernels 6.13+ free each file on its own.
+- The slow-disk guard never fired in a passing run (0 slow commits; every commit on the loop).
+- Build on the box (1 vCPU): `install.sh` 12 s, `build.sh` 184-201 s including the PGO training run, `test/run.sh` 42/42.
 
 ## Knobs (all optional; the defaults are what is scored)
 
@@ -163,8 +188,10 @@ commit, default 20000 / 1024), `KN_PACE_NR` / `KN_PACE_US` (batch wake, default 
 `KN_DEFER=1` (`DEFER_TASKRUN` rings), `KN_PASS=sweep` (the davidhsv pass structure; `KN_PACE_ALWAYS`), `KN_COMMITTER=1`
 (commit on the committer thread always), `KN_SLOW_MS` / `KN_SLOW_CK_MS` / `KN_SLOW_MEM_PCT` / `KN_SLOW_HOLD_MS` (slow-disk
 guard, default 50 / 200 / 90 / 10000; `KN_SLOW_MEM_PCT=0` = no memory trigger), `KN_CACHE_KB` (reader page cache, default 65536), `KN_MAX_EV` (events per pass, default 4096), `KN_LISTENERS` (1-8),
-`KN_HDR=0` (the old two-pass head parser), `KN_MLOCK=0`, `KN_RINGS`, `KN_STATS=1` / `KN_PROF=1` / `KN_CKPT_LOG=1`
-(counters on stdout/stderr every 10 s), `KN_STALLS=1` (log passes over 100 ms), `KN_VERIFY=1` (the byte-for-byte
+`KN_HDR=0` (the old two-pass head parser), `KN_MLOCK=0`, `KN_RINGS`, `KN_NBUF` (provided receive buffers per ring, a power
+of two, default 1024), `KN_REARM` (receives re-armed per pass after `ENOBUFS`, default 256, 0 = all), `KN_STATS=1` /
+`KN_PROF=1` / `KN_CKPT_LOG=1` (counters on stdout/stderr every 10 s; `KN_STATS` also counts why connections ended, by
+errno), `KN_STALLS=1` (log passes over 100 ms), `KN_VERIFY=1` (the byte-for-byte
 check above). Build: `KN_CPGO=0` (no profile), `KN_CFLAGS`, `KN_TRAIN_PORT` / `KN_TRAIN_REQS` / `KN_TRAIN_CONNS` /
 `KN_TRAIN_TIMEOUT`. Test only: `KN_TEST_WAL_DELAY_US` (sleep in every WAL write, for the slow-disk guard).
 

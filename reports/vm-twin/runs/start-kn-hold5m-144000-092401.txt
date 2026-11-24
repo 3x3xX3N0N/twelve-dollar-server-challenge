@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 545af21c52ab4d15a4579590294e5226
+healthy after .055079646 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 1: used=65279 accepts=0 cqes=3258003 accepted=130925 sq_ready=1122 cq_ready=2059 flags=0
+  ring 2: used=28242 accepts=473 cqes=1132815 accepted=54010 sq_ready=569 cq_ready=786 flags=0
+srv.service: A process of this unit has been killed by the OOM killer.
+srv.service: Main process exited, code=killed, status=9/KILL
+srv.service: Failed with result 'oom-kill'.
+srv.service: Consumed 2min 23.433s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+ring 2 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 3min 12.327s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795530245.965401104 cpu_user=128572 cpu_nice=386 cpu_sys=63309 cpu_idle=44147 cpu_iowait=302534 cpu_irq=0 cpu_softirq=61335 cpu_steal=819 cg_usage_usec=32997 cg_user_usec=10163 cg_system_usec=22833 cg_core_sched.force_idle_usec=0 cg_mem=20549632 cg_peak=21241856 cgm_anon=15093760 cgm_file=2633728 cgm_kernel=2822144 cgm_sock=0 cgm_slab=1325176 rss_kb=20336 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1195048 mi_MemAvailable=1671052 mi_Cached=605256 mi_AnonPages=74252 mi_Slab=86580 tcp_inuse=5 tcp_orphan=0 tcp_tw=4 tcp_alloc=6 tcp_mem_pages=68 io_some=90.01 conntrack=none load=0.52

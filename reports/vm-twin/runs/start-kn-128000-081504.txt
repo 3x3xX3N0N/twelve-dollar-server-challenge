@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 059ac4bd32554892969fae96660091f8
+healthy after .130171736 s: {"status":"ok","db":"ok","uptime_s":0}
+stats: open=102724 rings=2 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1146810 sql=0 snapshots=5713 parked=2470 walw=321537 walpw=10503 commits loop=5726 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=65279 accepts=0 cqes=1788438 accepted=66281 sq_ready=4 cq_ready=0 flags=0
+  ring 1: used=37445 accepts=512 cqes=906831 accepted=46721 sq_ready=2 cq_ready=0 flags=0
+stats: open=74334 rings=2 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1210829 sql=0 snapshots=6164 parked=2595 walw=347927 walpw=11276 commits loop=6177 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=59794 accepts=0 cqes=1935439 accepted=66281 sq_ready=7 cq_ready=0 flags=0
+  ring 1: used=14540 accepts=512 cqes=968886 accepted=46721 sq_ready=1 cq_ready=0 flags=0
+stats: open=37222 rings=2 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1237533 sql=0 snapshots=6600 parked=2660 walw=364416 walpw=11900 commits loop=6613 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=36077 accepts=0 cqes=2053557 accepted=66281 sq_ready=6 cq_ready=0 flags=0
+  ring 1: used=1145 accepts=512 cqes=995833 accepted=46721 sq_ready=0 cq_ready=0 flags=0
+stats: open=2389 rings=2 enobufs=0 rearms=0 sweeps=0 accept_err=0 btree=1239762 sql=0 snapshots=6829 parked=2674 walw=370026 walpw=12360 commits loop=6912 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=2389 accepts=0 cqes=2129231 accepted=66281 sq_ready=589 cq_ready=0 flags=0
+  ring 1: used=0 accepts=512 cqes=998123 accepted=46721 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 40.905s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795526107.634308420 cpu_user=89753 cpu_nice=194 cpu_sys=17986 cpu_idle=34709 cpu_iowait=41001 cpu_irq=0 cpu_softirq=8376 cpu_steal=100 cg_usage_usec=19332 cg_user_usec=0 cg_system_usec=19332 cg_core_sched.force_idle_usec=0 cg_mem=17960960 cg_peak=18456576 cgm_anon=15089664 cgm_file=32768 cgm_kernel=2838528 cgm_sock=0 cgm_slab=1323608 rss_kb=20332 nprocs=1 mi_MemTotal=2009040 mi_MemFree=527964 mi_MemAvailable=1633268 mi_Cached=1113600 mi_AnonPages=66192 mi_Slab=179568 tcp_inuse=5 tcp_orphan=0 tcp_tw=3 tcp_alloc=6 tcp_mem_pages=192 io_some=87.27 conntrack=none load=0.39

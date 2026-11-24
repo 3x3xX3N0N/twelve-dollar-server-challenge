@@ -1,0 +1,16 @@
+Running as unit: srv.service; invocation ID: 0578f3012e2b49029e97f421c973ad83
+healthy after 2.056679776 s: {"status":"ok","db":"ok","uptime_s":0}
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 2 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+srv.service: Consumed 2min 4.045s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-nio-3x3xX3N0N/start.sh.
+worker 2 listening on 0.0.0.0:80
+worker 0 listening on 0.0.0.0:80
+worker 1 listening on 0.0.0.0:80
+t=1795525311.183271298 cpu_user=78590 cpu_nice=79 cpu_sys=9765 cpu_idle=21161 cpu_iowait=1271 cpu_irq=0 cpu_softirq=2413 cpu_steal=17 cg_usage_usec=1934149 cg_user_usec=1779079 cg_system_usec=155069 cg_core_sched.force_idle_usec=0 cg_mem=133849088 cg_peak=134107136 cgm_anon=127578112 cgm_file=3366912 cgm_kernel=2904064 cgm_sock=0 cgm_slab=1167192 rss_kb=207824 nprocs=4 mi_MemTotal=2009040 mi_MemFree=325740 mi_MemAvailable=1528656 mi_Cached=1160044 mi_AnonPages=176612 mi_Slab=181588 tcp_inuse=4 tcp_orphan=0 tcp_tw=2 tcp_alloc=8 tcp_mem_pages=211 io_some=0.59 conntrack=none load=1.33

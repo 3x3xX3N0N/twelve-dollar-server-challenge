@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 03bc2f360534448f950202a35cfd0618
+healthy after .910052707 s: {"status":"ok","db":"ok","uptime_s":0}
+stats: open=6754 rings=3 enobufs=15509 rearms=15509 sweeps=0 accept_err=0 btree=1438647 sql=0 snapshots=6299 parked=3095 walw=405701 walpw=12263 commits loop=6129 thread=281 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=5955 accepts=512 cqes=2017446 accepted=105171 sq_ready=19 cq_ready=0 flags=0
+  ring 1: used=799 accepts=0 cqes=1286974 accepted=73853 sq_ready=3 cq_ready=0 flags=0
+  ring 2: used=0 accepts=0 cqes=561487 accepted=40419 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 53.070s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 36.782s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795527668.773860768 cpu_user=102154 cpu_nice=291 cpu_sys=33611 cpu_idle=35632 cpu_iowait=149157 cpu_irq=0 cpu_softirq=25186 cpu_steal=318 cg_usage_usec=976589 cg_user_usec=879027 cg_system_usec=97561 cg_core_sched.force_idle_usec=0 cg_mem=60260352 cg_peak=60502016 cgm_anon=55853056 cgm_file=0 cgm_kernel=4407296 cgm_sock=0 cgm_slab=1486384 rss_kb=81868 nprocs=1 mi_MemTotal=2009040 mi_MemFree=931804 mi_MemAvailable=1591660 mi_Cached=682956 mi_AnonPages=106432 mi_Slab=174908 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=22 io_some=80.28 conntrack=none load=0.25

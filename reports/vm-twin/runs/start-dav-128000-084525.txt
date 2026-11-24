@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 595259083a344dc99e55619a535f95b9
+healthy after .918519088 s: {"status":"ok","db":"ok","uptime_s":0}
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 36.782s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 45.568s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795527928.881550857 cpu_user=104628 cpu_nice=296 cpu_sys=35979 cpu_idle=35705 cpu_iowait=167634 cpu_irq=0 cpu_softirq=27405 cpu_steal=397 cg_usage_usec=992972 cg_user_usec=887830 cg_system_usec=105142 cg_core_sched.force_idle_usec=0 cg_mem=60174336 cg_peak=60411904 cgm_anon=55762944 cgm_file=0 cgm_kernel=4411392 cgm_sock=0 cgm_slab=1485952 rss_kb=81820 nprocs=1 mi_MemTotal=2009040 mi_MemFree=884728 mi_MemAvailable=1482504 mi_Cached=717828 mi_AnonPages=114296 mi_Slab=173428 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=16 io_some=80.11 conntrack=none load=0.32

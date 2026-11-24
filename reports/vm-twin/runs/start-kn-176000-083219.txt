@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 4c5d934f140b43fe974b7d3f65f59659
+healthy after .037350941 s: {"status":"ok","db":"ok","uptime_s":0}
+stats: open=109055 rings=3 enobufs=97012 rearms=97012 sweeps=0 accept_err=0 btree=1419099 sql=0 snapshots=4663 parked=3052 walw=369586 walpw=9984 commits loop=4168 thread=496 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=63390 accepts=512 cqes=1869812 accepted=100355 sq_ready=7 cq_ready=0 flags=0
+  ring 1: used=41410 accepts=0 cqes=1358110 accepted=80058 sq_ready=5 cq_ready=0 flags=0
+  ring 2: used=4255 accepts=0 cqes=398243 accepted=30935 sq_ready=0 cq_ready=0 flags=0
+stats: open=55824 rings=3 enobufs=97012 rearms=97012 sweeps=0 accept_err=0 btree=1461621 sql=0 snapshots=5109 parked=3233 walw=395300 walpw=10754 commits loop=4614 thread=496 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=42359 accepts=512 cqes=2010455 accepted=101804 sq_ready=8 cq_ready=6 flags=0
+  ring 1: used=13332 accepts=0 cqes=1428199 accepted=80058 sq_ready=2 cq_ready=1 flags=0
+  ring 2: used=133 accepts=0 cqes=406677 accepted=30935 sq_ready=0 cq_ready=1 flags=0
+stats: open=3727 rings=3 enobufs=97012 rearms=97012 sweeps=0 accept_err=0 btree=1464813 sql=0 snapshots=5343 parked=3269 walw=403300 walpw=11260 commits loop=4954 thread=496 busy=0 slow=1 ckslow=0 memslow=0
+  ring 0: used=3387 accepts=512 cqes=2106330 accepted=101804 sq_ready=20 cq_ready=0 flags=0
+  ring 1: used=331 accepts=0 cqes=1454976 accepted=80058 sq_ready=3 cq_ready=0 flags=0
+  ring 2: used=9 accepts=0 cqes=406931 accepted=30935 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 1min 8.794s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795527142.084686640 cpu_user=97972 cpu_nice=269 cpu_sys=28896 cpu_idle=35390 cpu_iowait=111403 cpu_irq=0 cpu_softirq=20206 cpu_steal=241 cg_usage_usec=23519 cg_user_usec=4055 cg_system_usec=19464 cg_core_sched.force_idle_usec=0 cg_mem=18063360 cg_peak=18833408 cgm_anon=15089664 cgm_file=163840 cgm_kernel=2809856 cgm_sock=0 cgm_slab=1311344 rss_kb=20324 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1007592 mi_MemAvailable=1534080 mi_Cached=642568 mi_AnonPages=66756 mi_Slab=188928 tcp_inuse=396 tcp_orphan=391 tcp_tw=2 tcp_alloc=397 tcp_mem_pages=572 io_some=78.79 conntrack=none load=0.82

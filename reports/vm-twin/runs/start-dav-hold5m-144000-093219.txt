@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: de2153c4fb954269afca0d868220fb12
+healthy after .918151846 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 2: used=7791 accepts=512 cqes=911609 accepted=13442 sq_ready=0 cq_ready=0 flags=0
+stats: open=95325 rings=3 enobufs=1050 rearms=1050 sweeps=0 accept_err=0 btree=4923682 sql=0 snapshots=16173 parked=15009 walw=1407757 walpw=36749 commits loop=16188 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=63601 accepts=0 cqes=5463432 accepted=66281 sq_ready=19 cq_ready=12 flags=0
+  ring 1: used=30542 accepts=0 cqes=4783417 accepted=65279 sq_ready=4 cq_ready=7 flags=0
+  ring 2: used=1182 accepts=512 cqes=925066 accepted=13442 sq_ready=0 cq_ready=2 flags=0
+stats: open=47617 rings=3 enobufs=1050 rearms=1050 sweeps=0 accept_err=0 btree=4958088 sql=0 snapshots=16607 parked=15194 walw=1428717 walpw=37429 commits loop=16622 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=42626 accepts=0 cqes=5592281 accepted=66281 sq_ready=5 cq_ready=0 flags=0
+  ring 1: used=4991 accepts=0 cqes=4836695 accepted=65279 sq_ready=2 cq_ready=0 flags=0
+  ring 2: used=0 accepts=512 cqes=927430 accepted=13442 sq_ready=0 cq_ready=0 flags=0
+stats: open=5725 rings=3 enobufs=1050 rearms=1050 sweeps=0 accept_err=0 btree=4961008 sql=0 snapshots=16846 parked=15254 walw=1436080 walpw=37930 commits loop=16958 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=5723 accepts=0 cqes=5679989 accepted=66281 sq_ready=619 cq_ready=0 flags=0
+  ring 1: used=2 accepts=0 cqes=4846675 accepted=65279 sq_ready=0 cq_ready=0 flags=0
+  ring 2: used=0 accepts=512 cqes=927430 accepted=13442 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 2min 25.320s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795530743.343941074 cpu_user=134318 cpu_nice=429 cpu_sys=69906 cpu_idle=44484 cpu_iowait=331812 cpu_irq=0 cpu_softirq=68288 cpu_steal=914 cg_usage_usec=998714 cg_user_usec=898414 cg_system_usec=100300 cg_core_sched.force_idle_usec=0 cg_mem=62529536 cg_peak=62771200 cgm_anon=55787520 cgm_file=2326528 cgm_kernel=4415488 cgm_sock=0 cgm_slab=1487616 rss_kb=81720 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1071128 mi_MemAvailable=1521232 mi_Cached=614860 mi_AnonPages=115048 mi_Slab=88908 tcp_inuse=13 tcp_orphan=0 tcp_tw=2 tcp_alloc=14 tcp_mem_pages=249 io_some=61.90 conntrack=none load=0.84

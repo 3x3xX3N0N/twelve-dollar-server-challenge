@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: ff6c7f1ef73a43b5b23933f2a451a633
+healthy after .749752869 s: {"status":"ok","db":"ok","uptime_s":0}
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 45.568s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+ring 1 added
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh...
+srv.service: Main process exited, code=exited, status=143/n/a
+srv.service: Failed with result 'exit-code'.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+srv.service: Consumed 44.932s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795528188.346316111 cpu_user=107027 cpu_nice=302 cpu_sys=38200 cpu_idle=35774 cpu_iowait=186323 cpu_irq=0 cpu_softirq=29546 cpu_steal=445 cg_usage_usec=818808 cg_user_usec=731519 cg_system_usec=87288 cg_core_sched.force_idle_usec=0 cg_mem=60170240 cg_peak=60198912 cgm_anon=55762944 cgm_file=0 cgm_kernel=4407296 cgm_sock=0 cgm_slab=1486000 rss_kb=81764 nprocs=1 mi_MemTotal=2009040 mi_MemFree=884988 mi_MemAvailable=1483148 mi_Cached=718192 mi_AnonPages=114316 mi_Slab=167836 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=14 io_some=82.99 conntrack=none load=0.60

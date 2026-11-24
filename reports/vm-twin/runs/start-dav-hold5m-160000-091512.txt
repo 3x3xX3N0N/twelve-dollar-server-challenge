@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 14426bfdd11d4b38a33889ec1b5350b7
+healthy after .878353667 s: {"status":"ok","db":"ok","uptime_s":0}
+  ring 2: used=16437 accepts=0 cqes=982214 accepted=42205 sq_ready=9 cq_ready=0 flags=0
+stats: open=140155 rings=3 enobufs=104730 rearms=104726 sweeps=0 accept_err=0 btree=3177511 sql=0 snapshots=10902 parked=8483 walw=868308 walpw=23038 commits loop=9923 thread=973 busy=0 slow=2 ckslow=0 memslow=1
+  ring 0: used=65279 accepts=0 cqes=3727292 accepted=131042 sq_ready=1 cq_ready=0 flags=0
+  ring 1: used=58439 accepts=512 cqes=2989499 accepted=124085 sq_ready=15 cq_ready=0 flags=0
+  ring 2: used=16437 accepts=0 cqes=1015682 accepted=42205 sq_ready=0 cq_ready=0 flags=0
+stats: open=154269 rings=3 enobufs=106296 rearms=106292 sweeps=0 accept_err=0 btree=3323250 sql=0 snapshots=11215 parked=9024 walw=907804 walpw=23938 commits loop=10236 thread=973 busy=0 slow=2 ckslow=0 memslow=1
+  ring 0: used=65279 accepts=0 cqes=3851585 accepted=131042 sq_ready=46 cq_ready=72 flags=0
+  ring 1: used=65279 accepts=0 cqes=3140731 accepted=130925 sq_ready=65 cq_ready=49 flags=0
+  ring 2: used=23711 accepts=511 cqes=1073320 accepted=49479 sq_ready=27 cq_ready=22 flags=0
+stats: open=158800 rings=3 enobufs=110805 rearms=109161 sweeps=0 accept_err=0 btree=3464229 sql=0 snapshots=11452 parked=9506 walw=941996 walpw=24672 commits loop=10472 thread=974 busy=0 slow=2 ckslow=0 memslow=2
+  ring 0: used=65279 accepts=0 cqes=3987417 accepted=131042 sq_ready=1045 cq_ready=1972 flags=0
+  ring 1: used=65279 accepts=0 cqes=3258003 accepted=130925 sq_ready=1122 cq_ready=2059 flags=0
+  ring 2: used=28242 accepts=473 cqes=1132815 accepted=54010 sq_ready=569 cq_ready=786 flags=0
+srv.service: A process of this unit has been killed by the OOM killer.
+srv.service: Main process exited, code=killed, status=9/KILL
+srv.service: Failed with result 'oom-kill'.
+srv.service: Consumed 2min 23.433s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/java-iouring-davidhsv/start.sh.
+WARNING: Using incubator modules: jdk.incubator.vector
+listening on 0.0.0.0:80; io_uring, 65535 direct descriptors per ring, 959 KB of code locked
+t=1795529716.411597980 cpu_user=121462 cpu_nice=366 cpu_sys=55067 cpu_idle=43578 cpu_iowait=276829 cpu_irq=0 cpu_softirq=50415 cpu_steal=689 cg_usage_usec=842203 cg_user_usec=749308 cg_system_usec=92894 cg_core_sched.force_idle_usec=0 cg_mem=95596544 cg_peak=96264192 cgm_anon=50761728 cgm_file=40251392 cgm_kernel=4583424 cgm_sock=0 cgm_slab=1673536 rss_kb=76724 nprocs=1 mi_MemTotal=2009040 mi_MemFree=1150856 mi_MemAvailable=1531932 mi_Cached=605236 mi_AnonPages=108920 mi_Slab=89244 tcp_inuse=12 tcp_orphan=0 tcp_tw=2 tcp_alloc=13 tcp_mem_pages=48 io_some=9.74 conntrack=none load=0.44

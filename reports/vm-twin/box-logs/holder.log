@@ -1,0 +1,13 @@
+2026-11-24T12:40:49Z ssh key 738050bf-6778-46e7-94f4-cb627dd4227d
+2026-11-24T12:40:50Z vpc 5ae89fa3-19d3-43f9-a7e9-a882319023c6
+2026-11-24T12:40:51Z server cd26b91b-92ba-486f-a691-bac9c45d7a57 (vhp-1c-2gb-intel)
+2026-11-24T12:40:52Z loadgen ac1997e8-c8f2-4ea0-ba6d-2c151de7b471 (vhp-8c-16gb-intel)
+Running as unit: tdsc-vmtwin-watchdog-1795524052.service; invocation ID: 474fdbca70e4477681a837e163867cff
+2026-11-24T12:40:52Z watchdog unit tdsc-vmtwin-watchdog-1795524052 rc=0
+2026-11-24T12:40:52Z status server pending/none gen pending/none
+2026-11-24T12:41:03Z status server active/locked gen active/locked
+2026-11-24T12:41:13Z status server active/locked gen active/ok
+2026-11-24T12:41:23Z status server active/locked gen active/ok
+2026-11-24T12:41:33Z status server active/locked gen active/ok
+2026-11-24T12:41:44Z status server active/ok gen active/ok
+2026-11-24T12:41:44Z ready

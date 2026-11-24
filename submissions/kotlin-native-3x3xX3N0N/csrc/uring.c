@@ -37,11 +37,11 @@
 #define MAX_RINGS 8
 #define SQ_ENTRIES 4096
 #define CQ_ENTRIES 32768
-#define NBUF 1024            /* provided buffers per ring (power of two); ENOBUFS never seen at 384k users */
+#define NBUF_DEFAULT 1024    /* provided buffers per ring (power of two, KN_NBUF); ENOBUFS never seen at 384k users */
 #define BUFSZ 2048
 #define ACCEPT_DEPTH 512
 #define FD_MARGIN 256
-#define REARM_MAX 256
+#define REARM_DEFAULT 256    /* receives re-armed per pass after ENOBUFS (KN_REARM; 0 = all) */
 #define DEFER_IDLE_US 1000   /* longest sleep on ring 0 while secondary rings (DEFER_TASKRUN) exist */
 
 enum { K_ACCEPT = 1, K_RECV = 2, K_SEND = 3, K_CLOSE = 4, K_SHUT = 5, K_EVFD = 6, K_WATCH = 7 };
@@ -85,6 +85,8 @@ static int64_t st_sweep_enters;
 static uint64_t efd_val, watch_val;
 static int watch_fd = -1;
 static int rearm_q[1 << 20], rearm_head, rearm_tail;   /* global slots waiting for a recv re-arm */
+static int NBUF = NBUF_DEFAULT, REARM_MAX = REARM_DEFAULT;
+static int64_t st_recv_eof, st_recv_err[160], st_send_err[160], st_send_zero, st_shuts;   /* why connections end (KN_STATS) */
 static int64_t st_open, st_enobufs, st_accept_err, st_rearms;
 static int64_t st_cqe[MAX_RINGS], st_acc_ok[MAX_RINGS];
 static kn_ev *g_evs;
@@ -220,6 +222,8 @@ int ur_init(const char *host, int port, int max_rings) {
     getrlimit(RLIMIT_NOFILE, &rl);
     table_size = rl.rlim_cur > 65535 ? 65535 : (int)rl.rlim_cur;
     if (getenv("KN_TABLE")) table_size = atoi(getenv("KN_TABLE"));   /* testing the ring spill with small tables */
+    if (getenv("KN_NBUF")) { int n = atoi(getenv("KN_NBUF")); if (n >= 64 && n <= 32768 && !(n & (n - 1))) NBUF = n; }
+    if (getenv("KN_REARM")) { int n = atoi(getenv("KN_REARM")); REARM_MAX = n > 0 ? n : 1 << 20; }
     if (table_size < 2 * FD_MARGIN) table_size = 2 * FD_MARGIN;
     maxrings = max_rings < 1 ? 1 : max_rings > MAX_RINGS ? MAX_RINGS : max_rings;
     defer_taskrun = getenv("KN_DEFER") && getenv("KN_DEFER")[0] == '1';
@@ -276,7 +280,7 @@ static void arm_recv(int r, int idx) {
 static void shut(int r, int idx) {
     conn *c = &R[r].conns[idx];
     if (c->shut) return;
-    c->shut = 1;
+    c->shut = 1; st_shuts++;
     struct io_uring_sqe *s = sqe_of(r);
     io_uring_prep_shutdown(s, idx, SHUT_RDWR);   /* the recv then ends with 0 and conn_closed() frees the slot */
     s->flags |= IOSQE_FIXED_FILE;
@@ -407,7 +411,7 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
         free(q);
         if (!mine) return;
         c->sending = 0;
-        if (res <= 0) { shut(sr, idx); return; }
+        if (res <= 0) { if (res == 0) st_send_zero++; else st_send_err[-res < 160 ? -res : 159]++; shut(sr, idx); return; }
         if (c->pend_len) {
             /* swap the queued output into a fresh send */
             int n = c->pend_len;
@@ -448,6 +452,7 @@ static void on_cqe(int r, struct io_uring_cqe *cqe) {
         }
         if (has_buf) recycle(r, bid);
         if (res == -ENOBUFS) { st_enobufs++; queue_rearm(r, idx); return; }
+        if (res == 0) st_recv_eof++; else st_recv_err[-res < 160 ? -res : 159]++;
         conn_closed(r, idx);   /* EOF, reset, or our shutdown */
         return;
     }
@@ -596,6 +601,12 @@ int64_t ur_stat(int which) {
     if (which >= 100 && which < 100 + MAX_RINGS) {   /* per ring: used, accepts in flight, CQEs, accepts done */
         int r = which - 100;
         if (r >= nrings) return -1;
+        if (r == 0) {
+            fprintf(stderr, "  ends: recv_eof=%lld shuts=%lld send_zero=%lld", (long long)st_recv_eof, (long long)st_shuts, (long long)st_send_zero);
+            for (int e = 1; e < 160; e++) if (st_recv_err[e]) fprintf(stderr, " recv_e%d=%lld", e, (long long)st_recv_err[e]);
+            for (int e = 1; e < 160; e++) if (st_send_err[e]) fprintf(stderr, " send_e%d=%lld", e, (long long)st_send_err[e]);
+            fprintf(stderr, "\n");
+        }
         fprintf(stderr, "  ring %d: used=%d accepts=%d cqes=%lld accepted=%lld sq_ready=%u cq_ready=%u flags=%x\n", r, R[r].used,
                 R[r].accepts, (long long)st_cqe[r], (long long)st_acc_ok[r], io_uring_sq_ready(&R[r].ring),
                 io_uring_cq_ready(&R[r].ring), *R[r].ring.sq.kflags);

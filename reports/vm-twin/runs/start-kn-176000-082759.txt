@@ -1,0 +1,23 @@
+Running as unit: srv.service; invocation ID: 80e9420d03854a0ca172daf25497d479
+healthy after .140887764 s: {"status":"ok","db":"ok","uptime_s":0}
+stats: open=106000 rings=3 enobufs=20 rearms=20 sweeps=0 accept_err=0 btree=1725954 sql=0 snapshots=5914 parked=4001 walw=474237 walpw=12959 commits loop=5933 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=64569 accepts=0 cqes=1993670 accepted=66281 sq_ready=8 cq_ready=12 flags=0
+  ring 1: used=37121 accepts=0 cqes=1536371 accepted=65279 sq_ready=3 cq_ready=4 flags=0
+  ring 2: used=4310 accepts=512 cqes=555222 accepted=29443 sq_ready=1 cq_ready=1 flags=0
+stats: open=52959 rings=3 enobufs=20 rearms=20 sweeps=0 accept_err=0 btree=1764350 sql=0 snapshots=6361 parked=4184 walw=497446 walpw=13682 commits loop=6380 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=44934 accepts=0 cqes=2127020 accepted=66281 sq_ready=11 cq_ready=0 flags=0
+  ring 1: used=8024 accepts=0 cqes=1599309 accepted=65279 sq_ready=0 cq_ready=0 flags=0
+  ring 2: used=1 accepts=512 cqes=563841 accepted=29443 sq_ready=0 cq_ready=0 flags=0
+stats: open=7940 rings=3 enobufs=20 rearms=20 sweeps=0 accept_err=0 btree=1767614 sql=0 snapshots=6569 parked=4255 walw=505178 walpw=14170 commits loop=6699 thread=0 busy=0 slow=0 ckslow=0 memslow=0
+  ring 0: used=7895 accepts=0 cqes=2216838 accepted=66281 sq_ready=1 cq_ready=0 flags=0
+  ring 1: used=45 accepts=0 cqes=1615267 accepted=65279 sq_ready=0 cq_ready=0 flags=0
+  ring 2: used=0 accepts=512 cqes=563843 accepted=29443 sq_ready=0 cq_ready=0 flags=0
+Stopping srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh...
+srv.service: Deactivated successfully.
+Stopped srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+srv.service: Consumed 52.798s CPU time.
+Started srv.service - /bin/bash /home/bench/repo/submissions/kotlin-native-3x3xX3N0N/start.sh.
+mlock: 2240 KB of the binary locked
+buf ring registered with resv[0]=1 (kernel quirk)
+listening on 0.0.0.0:80 (vfs unix, btree reads on)
+t=1795526882.766863281 cpu_user=95796 cpu_nice=247 cpu_sys=25396 cpu_idle=35147 cpu_iowait=96173 cpu_irq=0 cpu_softirq=15670 cpu_steal=189 cg_usage_usec=32620 cg_user_usec=9887 cg_system_usec=22733 cg_core_sched.force_idle_usec=0 cg_mem=17928192 cg_peak=18558976 cgm_anon=15093760 cgm_file=32768 cgm_kernel=2801664 cgm_sock=0 cgm_slab=1310128 rss_kb=20336 nprocs=1 mi_MemTotal=2009040 mi_MemFree=519984 mi_MemAvailable=1602640 mi_Cached=1115252 mi_AnonPages=66216 mi_Slab=184476 tcp_inuse=5 tcp_orphan=0 tcp_tw=3 tcp_alloc=6 tcp_mem_pages=128 io_some=76.61 conntrack=none load=0.72

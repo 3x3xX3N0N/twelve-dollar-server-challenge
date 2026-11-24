@@ -1,0 +1,1 @@
+t=1795529672.224961122 cpu_user=121333 cpu_nice=366 cpu_sys=54974 cpu_idle=39837 cpu_iowait=276628 cpu_irq=0 cpu_softirq=50402 cpu_steal=684 mi_MemTotal=2009040 mi_MemFree=1723780 mi_MemAvailable=1689212 mi_Cached=69764 mi_AnonPages=58832 mi_Slab=80620 tcp_inuse=4 tcp_orphan=0 tcp_tw=3 tcp_alloc=5 tcp_mem_pages=48 io_some=0.48 conntrack=none load=0.94
